@@ -1,13 +1,11 @@
-# Welcome to Remix!
-
-- 📖 [Remix docs](https://remix.run/docs)
+# Welcome to pathway
 
 ## Development
 
 Run the dev server:
 
-```shellscript
-npm run dev
+```sh
+bun run dev
 ```
 
 ## Deployment
@@ -15,26 +13,50 @@ npm run dev
 First, build your app for production:
 
 ```sh
-npm run build
+bun run build
 ```
 
 Then run the app in production mode:
 
 ```sh
-npm start
+bun run start
 ```
 
-Now you'll need to pick a host to deploy it to.
+### contracts
 
-### DIY
+you'd need to have [foundry](https://foundry.sh) installed first
 
-If you're familiar with deploying Node applications, the built-in Remix app server is production-ready.
+to build contracts
 
-Make sure to deploy the output of `npm run build`
+```sh
+bun run forge:build
+```
 
-- `build/server`
-- `build/client`
+to deploy contracts
 
-## Styling
+```sh
+# add PRIVATE_KEY="0x..." to .env
+# then run
 
-This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever css framework you prefer. See the [Vite docs on css](https://vitejs.dev/guide/features.html#css) for more information.
+bun run deploy [mode]
+```
+
+there are three modes:
+
+- ethereum
+- arbitrum
+- base
+
+to deploy to multiple modes
+
+```sh
+bun run deploy <mode1> <mode2> <mode3>
+```
+
+### installing packages
+
+```sh
+bun install <package>
+# or
+bun add <package>
+```
