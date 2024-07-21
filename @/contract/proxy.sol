@@ -56,14 +56,14 @@ contract Proxy {
     ) {
         IERC20(usdc).approve(messenger, type(uint256).max);
         (
-            ProxyConfig storage config,
+            ProxyConfig storage conf,
             bytes32 impl_slot
         ) = get_proxy_config_state();
-        config.messenger = messenger;
-        config.trasmitter = trasmitter;
-        config.usdc = usdc;
 
         assembly {
+            sstore(conf.slot, messenger)
+            sstore(add(conf.slot, 1), trasmitter)
+            sstore(add(conf.slot, 2), usdc)
             sstore(impl_slot, shr(96, shl(96, implementation)))
         }
     }
@@ -73,10 +73,9 @@ contract Proxy {
         pure
         returns (ProxyConfig storage config, bytes32 impl_slot)
     {
-        bytes32 config_slot = 0x46e5b76fa5812da972ac2243cafd26236a072d9ff0770f97bad20263935dd600;
-        impl_slot = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
         assembly ("memory-safe") {
-            config.slot := config_slot
+            impl_slot := 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc
+            config.slot := 0x46e5b76fa5812da972ac2243cafd26236a072d9ff0770f97bad20263935dd600
         }
     }
 
