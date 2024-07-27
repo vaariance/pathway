@@ -1,5 +1,13 @@
 import { mainnet, arbitrum, base, Chain as ViemChain } from "viem/chains";
 import base_contract from "../../out/deployments/base/latest.json";
+import { Address } from "viem";
+
+export enum Chains {
+  noble = "noble",
+  ethereum = "ethereum",
+  arbitrum = "arbitrum",
+  base = "base",
+}
 
 export enum USDC_CONTRACTS {
   ethereum = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
@@ -12,6 +20,7 @@ export const PROXY_CONTRACTS = {
   arbitrum: null,
   base: base_contract,
   ethereum: null,
+  noble: null,
 };
 
 export const IMPLEMENTATION_CONTRACT =
@@ -28,17 +37,24 @@ export enum MESSAGE_TRANSMITTERS {
   arbitrum = "0xC30362313FBBA5cf9163F0bb16a0e01f01A896ca",
   ethereum = "0x0a992d191deec32afe36203ad87d7d289a738f81",
   base = "0xAD09780d193884d503182aD4588450C416D6F9D4",
-  noble = "",
+  noble = "/circle.cctp.v1.MsgReceiveMessage",
 }
 
-export enum DOMIANS {
+export enum DOMAINS {
   ethereum = 0,
   noble = 4,
   arbitrum = 3,
   base = 6,
 }
 
-export type Chain = {
+export const REVERSE_DOMAINS: Record<number, Chains> = {
+  0: Chains.ethereum,
+  4: Chains.noble,
+  3: Chains.arbitrum,
+  6: Chains.base,
+};
+
+export type ChainMetadata = {
   value: Mode;
   name: string;
   img_src: string;
@@ -46,36 +62,32 @@ export type Chain = {
   type: Mode;
 };
 
-export const chain_data: Chain[] = [
+export const chain_data: ChainMetadata[] = [
   {
     value: "noble",
     name: "Noble",
-    img_src:
-      "https://raw.githubusercontent.com/cosmos/chain-registry/8304df2430e1d3418bb2102ac76af5a138141216/noble/images/stake.svg",
+    img_src: "/noble.svg",
     fallback: "NB",
     type: "noble",
   },
   {
     value: "ethereum",
     name: "Ethereum",
-    img_src:
-      "https://ethereum.org/_next/static/media/eth-diamond-purple.7929ed26.png",
+    img_src: "/eth.png",
     fallback: "ETH",
     type: "ethereum",
   },
   {
     value: "arbitrum",
     name: "Arbitrum",
-    img_src:
-      "https://file.notion.so/f/f/80206c3c-8bc5-49a2-b0cd-756884a06880/810c0e00-6698-45da-9ed7-1766749a67c4/0923_One_Logos_Logomark_RGB.svg?id=c347059c-7e53-4cc8-ab36-f1c7481a1a01&table=block&spaceId=80206c3c-8bc5-49a2-b0cd-756884a06880&expirationTimestamp=1721397600000&signature=Vp6ptKKV7-bvZbVsFCeq3kJ1tOay16rbT9OijYuF0bw&downloadName=0923_One_Logos_Logomark_primary_RGB.svg",
+    img_src: "/arb.svg",
     fallback: "ARB",
     type: "ethereum",
   },
   {
     value: "base",
     name: "Base",
-    img_src:
-      "https://raw.githubusercontent.com/base-org/brand-kit/8984fe6e08be3058fd7cf5cd0b201f8b92b5a70e/logo/in-product/Base_Network_Logo.svg",
+    img_src: "/base.svg",
     fallback: "OP",
     type: "ethereum",
   },
@@ -83,7 +95,7 @@ export const chain_data: Chain[] = [
 
 interface AssetInfo {
   chain: string;
-  address: `0x${string}` | string;
+  address: Address | string;
   url: string;
 }
 
@@ -103,7 +115,7 @@ export const AssetsList: { [key: string]: AssetInfo } = {
     address: USDC_CONTRACTS.base,
     url: "https://basescan.org/token/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
   },
-  noble: {
+  "noble-1": {
     chain: "noble",
     address: USDC_CONTRACTS.noble,
     url: "http://mintscan.io/noble/assets",
@@ -112,9 +124,9 @@ export const AssetsList: { [key: string]: AssetInfo } = {
 
 export type Mode = "noble" | "ethereum" | "arbitrum" | "base";
 
-export type Path = {
+export type PathContructor = {
   from: Mode;
-  to: Chain | null;
+  to: ChainMetadata | null;
   inverse: Mode;
   amount: string;
   balance?: string;
@@ -122,9 +134,248 @@ export type Path = {
   error: Record<string, unknown> | null;
 };
 
-export const VIEM_NETWORKS: Record<Partial<Mode>, ViemChain | undefined> = {
+export const VIEM_NETWORKS: Record<Mode, ViemChain | undefined> = {
   ethereum: mainnet,
   arbitrum: arbitrum,
   base: base,
   noble: undefined,
+};
+
+const miliseconds = 60 * 1000;
+
+export const SOURCE_CHAIN_CONFIRMATIONS = {
+  ethereum: 14 * miliseconds,
+  noble: 0.35 * miliseconds,
+  arbitrum: 14 * miliseconds,
+  base: 14 * miliseconds,
+};
+
+export const IERC20 = [
+  {
+    type: "function",
+    name: "allowance",
+    inputs: [
+      { name: "owner", type: "address", internalType: "address" },
+      { name: "spender", type: "address", internalType: "address" },
+    ],
+    outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "approve",
+    inputs: [
+      { name: "spender", type: "address", internalType: "address" },
+      { name: "value", type: "uint256", internalType: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool", internalType: "bool" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "balanceOf",
+    inputs: [{ name: "account", type: "address", internalType: "address" }],
+    outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "transfer",
+    inputs: [
+      { name: "to", type: "address", internalType: "address" },
+      { name: "value", type: "uint256", internalType: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool", internalType: "bool" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "transferFrom",
+    inputs: [
+      { name: "from", type: "address", internalType: "address" },
+      { name: "to", type: "address", internalType: "address" },
+      { name: "value", type: "uint256", internalType: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool", internalType: "bool" }],
+    stateMutability: "nonpayable",
+  },
+] as const;
+
+export const ICCTP = [
+  {
+    type: "function",
+    name: "depositForBurnWithCaller",
+    inputs: [
+      { name: "amount", type: "uint256", internalType: "uint256" },
+      { name: "destinationDomain", type: "uint32", internalType: "uint32" },
+      { name: "mintRecipient", type: "bytes32", internalType: "bytes32" },
+      { name: "burnToken", type: "address", internalType: "address" },
+      { name: "destinationCaller", type: "bytes32", internalType: "bytes32" },
+    ],
+    outputs: [{ name: "_nonce", type: "uint64", internalType: "uint64" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "receiveMessage",
+    inputs: [
+      { name: "message", type: "bytes", internalType: "bytes" },
+      { name: "attestation", type: "bytes", internalType: "bytes" },
+    ],
+    outputs: [{ name: "success", type: "bool", internalType: "bool" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "event",
+    name: "MessageSent",
+    inputs: [
+      { name: "message", type: "bytes", indexed: false, internalType: "bytes" },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "event",
+    name: "MessageReceived",
+    inputs: [
+      {
+        name: "caller",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+      {
+        name: "sourceDomain",
+        type: "uint32",
+        indexed: false,
+        internalType: "uint32",
+      },
+      { name: "nonce", type: "uint64", indexed: true, internalType: "uint64" },
+      {
+        name: "sender",
+        type: "bytes32",
+        indexed: false,
+        internalType: "bytes32",
+      },
+      {
+        name: "messageBody",
+        type: "bytes",
+        indexed: false,
+        internalType: "bytes",
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: "event",
+    name: "DepositForBurn",
+    inputs: [
+      { name: "nonce", type: "uint64", indexed: true, internalType: "uint64" },
+      {
+        name: "burnToken",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+      {
+        name: "amount",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
+      {
+        name: "depositor",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+      {
+        name: "mintRecipient",
+        type: "bytes32",
+        indexed: false,
+        internalType: "bytes32",
+      },
+      {
+        name: "destinationDomain",
+        type: "uint32",
+        indexed: false,
+        internalType: "uint32",
+      },
+      {
+        name: "destinationTokenMessenger",
+        type: "bytes32",
+        indexed: false,
+        internalType: "bytes32",
+      },
+      {
+        name: "destinationCaller",
+        type: "bytes32",
+        indexed: false,
+        internalType: "bytes32",
+      },
+    ],
+    anonymous: false,
+  },
+] as const;
+
+export const DESTINATION_CALLERS: Record<Chains, Address | string> = {
+  [Chains.noble]: "process.env.NOBLE_CALLER as string as never",
+  [Chains.ethereum]: "process.env.ETHEREUM_CALLER as Address",
+  [Chains.arbitrum]: "process.env.ETHEREUM_CALLER as Address",
+  [Chains.base]: "process.env.ETHEREUM_CALLER as Address",
+};
+
+export const AGGREGATOR_V3_INTERFACE = [
+  {
+    inputs: [],
+    name: "decimals",
+    outputs: [{ internalType: "uint8", name: "", type: "uint8" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "description",
+    outputs: [{ internalType: "string", name: "", type: "string" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "uint80", name: "_roundId", type: "uint80" }],
+    name: "getRoundData",
+    outputs: [
+      { internalType: "uint80", name: "roundId", type: "uint80" },
+      { internalType: "int256", name: "answer", type: "int256" },
+      { internalType: "uint256", name: "startedAt", type: "uint256" },
+      { internalType: "uint256", name: "updatedAt", type: "uint256" },
+      { internalType: "uint80", name: "answeredInRound", type: "uint80" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "latestRoundData",
+    outputs: [
+      { internalType: "uint80", name: "roundId", type: "uint80" },
+      { internalType: "int256", name: "answer", type: "int256" },
+      { internalType: "uint256", name: "startedAt", type: "uint256" },
+      { internalType: "uint256", name: "updatedAt", type: "uint256" },
+      { internalType: "uint80", name: "answeredInRound", type: "uint80" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "version",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
+export const ETH_USD_PRICE_FEEDS: Record<string, Address> = {
+  ethereum: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
+  arbitrum: "0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612",
+  base: "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
 };

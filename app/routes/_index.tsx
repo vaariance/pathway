@@ -1,5 +1,6 @@
 import { Body } from "@/components/Body";
 import Header from "@/components/Header";
+import PathwayBackground from "@/components/ui/path";
 import type { MetaFunction } from "@remix-run/node";
 
 export const meta: MetaFunction = () => {
@@ -12,6 +13,7 @@ export const meta: MetaFunction = () => {
 export default function Index() {
   return (
     <main className="h-screen relative">
+      <PathwayBackground />
       <Header />
       <Body />
     </main>

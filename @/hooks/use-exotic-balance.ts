@@ -7,16 +7,18 @@ import { AssetsList } from "@/constants/.";
 
 export const useExoticBalance = (mode: string) => {
   const [cosmos_balance, set_cosmos_balance] = useState<bigint>(BigInt(0));
-  const { address, getRpcEndpoint, isWalletConnected } = useChain("noble");
+  const { address, getRpcEndpoint, isWalletConnected, chain } =
+    useChain("noble");
+
   const chain_id = useChainId();
   const { address: eth_address, isConnected } = useAccount();
 
   const coin = useMemo(() => {
     const chainassets = assets.find((chain) => chain.chain_name === mode);
     return chainassets?.assets.find(
-      (asset) => asset.base === AssetsList[mode]?.address
+      (asset) => asset.base === AssetsList[chain.chain_id]?.address
     );
-  }, [mode]);
+  }, [chain.chain_id, mode]);
 
   const evm_balance = useBalance({
     address: eth_address,

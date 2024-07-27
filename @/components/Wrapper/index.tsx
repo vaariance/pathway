@@ -9,7 +9,7 @@ import { useLocation, useNavigate } from "@remix-run/react";
 import { useSwitchChain } from "wagmi";
 
 import { useExoticBalance } from "@/hooks/use-exotic-balance";
-import { Chain, chain_data, Mode, Path } from "@/constants/.";
+import { ChainMetadata, chain_data, Mode, PathContructor } from "@/constants/.";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type WrapperProps<T> = {
@@ -18,7 +18,7 @@ type WrapperProps<T> = {
     set_error: Dispatch<Record<string, unknown> | null>,
     set_amount: Dispatch<SetStateAction<string>>,
     set_address: Dispatch<SetStateAction<string>>,
-    path: Path,
+    path: PathContructor,
     on_accept: () => void,
     accepted: boolean,
     change_route: (next: string) => void,
@@ -32,7 +32,7 @@ export const Wrapper = <T extends Element>({ children }: WrapperProps<T>) => {
   const { chains, switchChain } = useSwitchChain();
 
   const [error, set_error] = useState<Record<string, unknown> | null>(null);
-  const [chain, set_chain] = useState<Chain | null>(null);
+  const [chain, set_chain] = useState<ChainMetadata | null>(null);
   const [amount, set_amount] = useState<string>("0");
   const [address, set_address] = useState<string>("");
   const [accepted, set_accepted] = useState(() => {
@@ -81,7 +81,7 @@ export const Wrapper = <T extends Element>({ children }: WrapperProps<T>) => {
   //   }
   // };
 
-  const path: Path = useMemo(() => {
+  const path: PathContructor = useMemo(() => {
     const from = mode;
     const inverse = mode === "noble" ? "ethereum" : "noble";
 

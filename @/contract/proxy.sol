@@ -21,6 +21,33 @@ interface IERC20 {
 }
 
 interface ICCTP {
+    event DepositForBurn(
+        uint64 indexed nonce,
+        address indexed burnToken,
+        uint256 amount,
+        address indexed depositor,
+        bytes32 mintRecipient,
+        uint32 destinationDomain,
+        bytes32 destinationTokenMessenger,
+        bytes32 destinationCaller
+    );
+
+    event MessageReceived(
+        address indexed caller,
+        uint32 sourceDomain,
+        uint64 indexed nonce,
+        bytes32 sender,
+        bytes messageBody
+    );
+
+    event MintAndWithdraw(
+        address indexed mintRecipient,
+        uint256 amount,
+        address indexed mintToken
+    );
+
+    event MessageSent(bytes message);
+
     function depositForBurnWithCaller(
         uint256 amount,
         uint32 destinationDomain,
@@ -54,7 +81,6 @@ contract Proxy {
         address trasmitter,
         address usdc
     ) {
-        IERC20(usdc).approve(messenger, type(uint256).max);
         (
             ProxyConfig storage conf,
             bytes32 impl_slot
@@ -68,6 +94,7 @@ contract Proxy {
         }
     }
 
+    /// @dev - same EIP1967 IMPLEMENTATION_SLOT
     function get_proxy_config_state()
         internal
         pure
@@ -102,43 +129,6 @@ contract Proxy {
                 return(0, returndatasize())
             }
         }
-    }
-
-    function depositForBurnWithCaller(
-        uint256 amount,
-        uint32 destination_domain,
-        bytes32 mint_receipient,
-        address burn_token,
-        bytes32 destination_caller,
-        uint256 fee_in_usdc
-    ) public returns (uint64 _nonce) {
-        (ProxyConfig memory config, ) = get_proxy_config_state();
-        IERC20 usdc = IERC20(burn_token);
-        address self = address(this);
-
-        uint256 balance = usdc.balanceOf(msg.sender);
-        require(balance >= amount, "Insufficient balance");
-
-        uint256 mgc_in_usd = 5 * 1e6;
-        uint256 fee_markup = fee_in_usdc / 2;
-        uint256 agc_in_usd = fee_markup > mgc_in_usd ? mgc_in_usd : fee_markup;
-        require(agc_in_usd < amount, "Insufficient amount");
-        uint256 actual_amount = amount - agc_in_usd;
-
-        uint256 allowance = usdc.allowance(msg.sender, self);
-        require(allowance >= amount, "Insufficient allowance");
-
-        bool recieved = usdc.transferFrom(msg.sender, self, amount);
-        require(recieved, "Transfer failed");
-
-        return
-            ICCTP(config.messenger).depositForBurnWithCaller(
-                actual_amount,
-                destination_domain,
-                mint_receipient,
-                burn_token,
-                destination_caller
-            );
     }
 
     /// entrypoint(call) -> proxy(delegate) -> impl(call) -> proxy(call) -> usdc/transmitter

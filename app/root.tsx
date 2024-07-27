@@ -65,30 +65,27 @@ const queryClient = new QueryClient();
 export default function App() {
   const data = useLoaderData<typeof loader>();
   return (
-    <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider
-          specifiedTheme={data.theme}
-          themeAction="/action/set-theme"
+    <ThemeProvider specifiedTheme={data.theme} themeAction="/action/set-theme">
+      <Layout>
+        <ChainProvider
+          chains={chains}
+          assetLists={assets}
+          wallets={[
+            ...keplrWallets,
+            cosmostationWallets[0],
+            ...leapwallets.slice(0, 2),
+            ...compass,
+          ]}
+          walletConnectOptions={{ signClient: { projectId: project_id } }}
+          walletModal={ExoticDialogCosmos}
         >
-          <Layout>
-            <ChainProvider
-              chains={chains}
-              assetLists={assets}
-              wallets={[
-                ...keplrWallets,
-                cosmostationWallets[0],
-                ...leapwallets.slice(0, 2),
-                ...compass,
-              ]}
-              walletConnectOptions={{ signClient: { projectId: project_id } }}
-              walletModal={ExoticDialogCosmos}
-            >
+          <WagmiProvider config={config}>
+            <QueryClientProvider client={queryClient}>
               <Outlet />
-            </ChainProvider>
-          </Layout>
-        </ThemeProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
+            </QueryClientProvider>
+          </WagmiProvider>
+        </ChainProvider>
+      </Layout>
+    </ThemeProvider>
   );
 }

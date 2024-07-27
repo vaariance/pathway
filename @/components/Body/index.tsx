@@ -50,7 +50,7 @@ import {
   useCallback,
 } from "react";
 import debounce from "lodash.debounce";
-import { chain_data, Path } from "@/constants/.";
+import { chain_data, PathContructor } from "@/constants/.";
 
 type BodyProps = React.ComponentProps<typeof Card>;
 
@@ -217,7 +217,7 @@ const ChainSelection = ({
   minified = false,
 }: {
   handle_change: (next: string) => void;
-  path: Path;
+  path: PathContructor;
   minified?: boolean;
 }) => {
   const trigger_content = minified ? (
@@ -414,7 +414,7 @@ function AddressSelection({
   set_address,
   change_chain,
 }: {
-  path: Path;
+  path: PathContructor;
   set_error: Dispatch<Record<string, unknown> | null>;
   set_address: Dispatch<SetStateAction<string>>;
   change_chain: Dispatch<string>;
