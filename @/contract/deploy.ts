@@ -91,6 +91,7 @@ const deploy_contracts = async (modes: Mode[]) => {
       transaction_hash: hash,
       address: receipt.contractAddress,
       bytecode: proxy.bytecode.object,
+      abi: proxy.abi,
     };
     save_deployment_details(mode, deployment_details);
 

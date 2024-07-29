@@ -1,5 +1,8 @@
 import { mainnet, arbitrum, base, Chain as ViemChain } from "viem/chains";
-import base_contract from "../../out/deployments/base/latest.json";
+import base_contract from "../../out/deployments/base/latest.json" assert { type: "json" };
+import ethereum_contract from "../../out/deployments/ethereum/latest.json" assert { type: "json" };
+import arbitrum_contract from "../../out/deployments/arbitrum/latest.json" assert { type: "json" };
+
 import { Address } from "viem";
 
 export enum Chains {
@@ -17,9 +20,9 @@ export enum USDC_CONTRACTS {
 }
 
 export const PROXY_CONTRACTS = {
-  arbitrum: null,
+  arbitrum: arbitrum_contract,
   base: base_contract,
-  ethereum: null,
+  ethereum: ethereum_contract,
   noble: null,
 };
 
