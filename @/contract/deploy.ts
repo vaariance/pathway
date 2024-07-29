@@ -82,7 +82,12 @@ const deploy_contracts = async (modes: Mode[]) => {
       abi: proxy.abi,
       bytecode: proxy.bytecode.object as `0x${string}`,
     });
-    const receipt = await client.waitForTransactionReceipt({ hash });
+    /// ethereum is slower so we wiat a bit more...
+    const confirmations = mode === "ethereum" ? 3 : 1;
+    const receipt = await client.waitForTransactionReceipt({
+      hash,
+      confirmations,
+    });
     console.log(`Deployed on ['${mode}'] at address:`, [
       receipt.contractAddress,
     ]);

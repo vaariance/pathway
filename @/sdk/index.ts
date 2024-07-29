@@ -419,7 +419,8 @@ export class Pathway<T, R> {
       const hash = await client.writeContract(
         request as WriteContractParameters
       );
-      await client.waitForTransactionReceipt({ hash });
+      const confirmations = from_chain === "ethereum" ? 3 : 1;
+      await client.waitForTransactionReceipt({ hash, confirmations });
       return {
         hash,
         gas: {
