@@ -77,7 +77,7 @@ functions:
   scheduler:
       handler: @/relayer/scheduler.handler
       events:
-        - schedule: rate(2 minute)
+        - schedule: rate(1 minute)
 
   api:
     handler: @/relayer/index.handler

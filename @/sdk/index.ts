@@ -26,6 +26,7 @@ import {
   ICCTP,
   IERC20,
   MESSAGE_TRANSMITTERS,
+  NOBLE_RPC,
   PROXY_CONTRACTS,
   REVERSE_DOMAINS,
   SOURCE_CHAIN_CONFIRMATIONS,
@@ -187,20 +188,24 @@ export class Pathway<T, R> {
    * @return {ViemWalletClient} The Ethereum client.
    * @throws {Error} If the Viem client is not available.
    */
-  private get_ethereum_client() {
+  private get_ethereum_client(chain?: Chains) {
     if (this.options?.viem_client) {
-      return this.options.viem_client as ViemWalletClient<T>;
+      return this.get_ethereum_wallet_client();
     }
-    throw new Error("Viem client is not available");
+    if (chain) {
+      return createPublicClient({
+        chain: VIEM_NETWORKS[chain],
+        transport: http(),
+      });
+    }
+    throw new Error("Viem client is not provided");
   }
 
   private get_ethereum_wallet_client() {
     if (this.options?.viem_client) {
-      return this.options.viem_client as Required<
-        T & WalletClient & PublicActions
-      >;
+      return this.options.viem_client as T & WalletClient & PublicActions;
     }
-    throw new Error("Viem client is not available");
+    throw new Error("Viem wallet client is not provided");
   }
 
   /**
@@ -210,27 +215,31 @@ export class Pathway<T, R> {
    * @throws {Error} If the Noble client is not available or if the Noble client expects an offline signer.
    */
   private async get_noble_client() {
+    if (this.options?.noble_client) {
+      return await this.get_noble_wallet_client();
+    }
+    return await StargateClient.connect(NOBLE_RPC);
+  }
+
+  private async get_noble_wallet_client() {
     if (this.options?.noble_client === undefined) {
-      throw new Error("Noble client is not available");
+      throw new Error("Noble client is not provided");
     }
     if (this.options.noble_client instanceof SigningStargateClient) {
       return this.options.noble_client;
     }
     const client = this.options.noble_client as R & CosmoskitWalletClient;
-    const signer = client.getOfflineSigner;
-    if (signer === undefined) {
+    const offline_signer = client.getOfflineSigner;
+    if (offline_signer === undefined) {
       throw new Error("Noble client expects an offline signer");
     }
-    const offline_signer = await signer("noble-1");
-    return await SigningStargateClient.connectWithSigner(
-      "https://noble-rpc.polkachu.com:443",
-      offline_signer
-    );
+    const signer = await offline_signer("noble-1");
+    return await SigningStargateClient.connectWithSigner(NOBLE_RPC, signer);
   }
 
   private async get_allowance(path: Path): Promise<boolean> {
     const { from_chain, amount, sender_address } = path;
-    const client = this.get_ethereum_client();
+    const client = this.get_ethereum_client(from_chain);
 
     if (from_chain !== Chains.noble) {
       const allowance = await client.readContract({
@@ -274,9 +283,7 @@ export class Pathway<T, R> {
    * @return {Promise<number>} A promise that resolves to the block height of the Noble client.
    */
   async get_noble_block_height(): Promise<bigint> {
-    const client = this.options?.noble_client
-      ? await this.get_noble_client()
-      : await StargateClient.connect("https://noble-rpc.polkachu.com:443");
+    const client = await this.get_noble_client();
     const height = await client.getHeight();
     return BigInt(height);
   }
@@ -287,12 +294,7 @@ export class Pathway<T, R> {
    * @return {Promise<number>} A promise that resolves to the current Ethereum block height.
    */
   async get_eth_block_height(domain: number): Promise<bigint> {
-    const client = this.options?.viem_client
-      ? this.get_ethereum_client()
-      : createPublicClient({
-          chain: VIEM_NETWORKS[REVERSE_DOMAINS[domain]],
-          transport: http(),
-        });
+    const client = this.get_ethereum_client(REVERSE_DOMAINS[domain]);
     return await client.getBlockNumber();
   }
 
@@ -365,7 +367,7 @@ export class Pathway<T, R> {
    */
   async reverse_ens_name(name: string): Promise<string | null> {
     if (name.endsWith(".eth")) {
-      return await this.get_ethereum_client().getEnsAddress({
+      return await this.get_ethereum_client(Chains.ethereum).getEnsAddress({
         name: normalize(name),
       });
     }
@@ -450,7 +452,7 @@ export class Pathway<T, R> {
     { simulate_only = false }
   ): Promise<ExecutionResponse> {
     const { from_chain, to_chain, sender_address, amount } = path;
-    const client = await this.get_noble_client();
+    const client = await this.get_noble_wallet_client();
     const receipient = this.get_bytes_from_hex(
       PROXY_CONTRACTS[to_chain]!.address as Address
     );
@@ -546,8 +548,11 @@ export class Pathway<T, R> {
    * @return {Promise<ReceiveMessage>} A promise that resolves to the generated receive message.
    * @throws {Error} If the transaction fails or the receipt is not found.
    */
-  async generate_noble_receive_message(hash: string): Promise<ReceiveMessage> {
-    const client = await this.get_ethereum_client();
+  async generate_noble_receive_message(
+    hash: string,
+    from_chain: Chains
+  ): Promise<ReceiveMessage> {
+    const client = await this.get_ethereum_client(from_chain);
     const receipt = await client.getTransactionReceipt({
       hash: hash as `0x${string}`,
     });
@@ -599,7 +604,7 @@ export class Pathway<T, R> {
       Buffer.from(circle_attestation!.slice(2), "hex")
     );
 
-    const client = await this.get_noble_client();
+    const client = await this.get_noble_wallet_client();
     const caller = outside_caller ?? DESTINATION_CALLERS[path!.to_chain];
 
     const msg = {
@@ -705,7 +710,7 @@ export class Pathway<T, R> {
       original_path: path,
     } = receive_message;
 
-    const client = this.get_ethereum_client();
+    const client = this.get_ethereum_client(path?.to_chain);
     const proxy = PROXY_CONTRACTS[path!.to_chain];
 
     const slope = this.get_fee_for_usdc_amount(path!.amount);
@@ -717,7 +722,10 @@ export class Pathway<T, R> {
       args: [path!.receiver_address, message_bytes, circle_attestation, slope],
     });
 
-    const gas_in_usdc = await this.get_usd_quote_for_wei(gas_used);
+    const gas_in_usdc = await this.get_usd_quote_for_wei(
+      gas_used,
+      path?.to_chain
+    );
     const total_fee = slope + gas_in_usdc;
 
     return {
@@ -798,7 +806,8 @@ export class Pathway<T, R> {
         simulate_only: false,
       });
       message = await this.generate_noble_receive_message(
-        execution_response.hash!
+        execution_response.hash!,
+        path.from_chain
       );
     }
 
@@ -913,8 +922,8 @@ export class Pathway<T, R> {
    * @param {bigint} wei - The amount of Wei for which to retrieve the USD quote.
    * @return {Promise<bigint>} A promise that resolves to the USD quote for the given amount of Wei.
    */
-  async get_usd_quote_for_wei(wei: bigint): Promise<bigint> {
-    const client = this.get_ethereum_client();
+  async get_usd_quote_for_wei(wei: bigint, chain?: Chains): Promise<bigint> {
+    const client = this.get_ethereum_client(chain);
 
     const round_data = await client.readContract({
       address: ETH_USD_PRICE_FEEDS[client.chain!.name],

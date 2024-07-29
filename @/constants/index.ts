@@ -318,10 +318,10 @@ export const ICCTP = [
 ] as const;
 
 export const DESTINATION_CALLERS: Record<Chains, Address | string> = {
-  [Chains.noble]: "process.env.NOBLE_CALLER as string as never",
-  [Chains.ethereum]: "process.env.ETHEREUM_CALLER as Address",
-  [Chains.arbitrum]: "process.env.ETHEREUM_CALLER as Address",
-  [Chains.base]: "process.env.ETHEREUM_CALLER as Address",
+  [Chains.noble]: "noble1ud8dqwgnrv8gpatl955kx0zjuhpw4n560dv5qy",
+  [Chains.ethereum]: PROXY_CONTRACTS.ethereum.address,
+  [Chains.arbitrum]: PROXY_CONTRACTS.arbitrum.address,
+  [Chains.base]: PROXY_CONTRACTS.base.address,
 };
 
 export const AGGREGATOR_V3_INTERFACE = [
@@ -379,3 +379,5 @@ export const ETH_USD_PRICE_FEEDS: Record<string, Address> = {
   arbitrum: "0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612",
   base: "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
 };
+
+export const NOBLE_RPC = "https://noble-rpc.polkachu.com:443";
