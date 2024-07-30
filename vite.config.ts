@@ -7,6 +7,7 @@ import tsconfigPaths from "vite-tsconfig-paths";
 import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfill";
 
 import { installGlobals } from "@remix-run/node";
+import rollupNodePolyFill from "rollup-plugin-node-polyfills";
 
 installGlobals();
 
@@ -37,6 +38,20 @@ export default defineConfig({
           buffer: true,
           process: true,
         }),
+      ],
+    },
+  },
+  resolve: {
+    alias: {
+      buffer: "buffer",
+    },
+  },
+
+  build: {
+    rollupOptions: {
+      plugins: [
+        // @ts-expect-error n/a
+        rollupNodePolyFill(),
       ],
     },
   },

@@ -9,3 +9,5 @@ node_modules
 .serverless
 env.yml
 ./test.js
+.dev.vars
+.wrangler
