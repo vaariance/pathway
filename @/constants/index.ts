@@ -384,3 +384,19 @@ export const ETH_USD_PRICE_FEEDS: Record<string, Address> = {
 };
 
 export const NOBLE_RPC = "https://noble-rpc.polkachu.com:443";
+
+export const get_pimlico_paymaster_for_chain = (
+  chain: Chains,
+  api_key: string
+) => {
+  switch (chain) {
+    case Chains.ethereum:
+      return `https://api.pimlico.io/v2/1/rpc?apikey=${api_key}`;
+    case Chains.arbitrum:
+      return `https://api.pimlico.io/v2/42161/rpc?apikey=${api_key}`;
+    case Chains.base:
+      return `https://api.pimlico.io/v2/8453/rpc?apikey=${api_key}`;
+    default:
+      throw new Error("Chain not supported");
+  }
+};

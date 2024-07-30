@@ -1,10 +1,10 @@
-import type { ReceiveMessage } from "@/sdk";
+import type { ReceiveMessage } from "../sdk/index.js";
 import { base, mainnet, arbitrum } from "@alchemy/aa-core";
 
 export type ReceiveMessageFormat = Required<
   Omit<ReceiveMessage, "circle_attestation">
 > & {
-  circle_attestation?: string;
+  circle_attestation?: `0x${string}`;
   submitted_at: string;
   tx_hash: string;
   retry_at?: string;

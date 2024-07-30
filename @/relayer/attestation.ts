@@ -10,7 +10,7 @@ import {
   AttestationResponse,
   AttestationStatus,
   ReceiveMessageFormat,
-} from "./types";
+} from "./types.js";
 import axios, { AxiosInstance, isAxiosError } from "axios";
 
 const client = new DynamoDBClient();

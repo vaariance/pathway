@@ -15,7 +15,7 @@ import {
 } from "remix-themes";
 
 import { themeSessionResolver } from "./sessions.server";
-import { LoaderFunctionArgs } from "@remix-run/node";
+import { LoaderFunctionArgs } from "@remix-run/cloudflare";
 import clsx from "clsx";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";

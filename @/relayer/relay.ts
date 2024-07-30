@@ -6,20 +6,25 @@ import {
   UpdateCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 import { SQSClient, SendMessageBatchCommand } from "@aws-sdk/client-sqs";
-import { ALCHEMY_CHAINS, ReceiveMessageFormat } from "./types";
-import { Pathway, PathwayOptions } from "@/sdk";
+import { ALCHEMY_CHAINS, ReceiveMessageFormat } from "./types.js";
+import { Pathway, PathwayOptions } from "../sdk/index.js";
 import {
   DOMAINS,
+  get_pimlico_paymaster_for_chain,
   ICCTP,
   MESSAGE_TRANSMITTERS,
   PROXY_CONTRACTS,
-} from "../constants";
-import { Abi, Address, encodeFunctionData } from "viem";
+  VIEM_NETWORKS,
+} from "../constants/index.js";
+import { Abi, Address, encodeFunctionData, http, createClient } from "viem";
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 import { SigningStargateClient } from "@cosmjs/stargate";
 
 import { createLightAccountAlchemyClient } from "@alchemy/aa-alchemy";
 import { LocalAccountSigner } from "@alchemy/aa-core";
+
+import { ENTRYPOINT_ADDRESS_V07 } from "permissionless";
+import { pimlicoPaymasterActions } from "permissionless/actions/pimlico";
 
 const client = new DynamoDBClient();
 const dynamodb_client = DynamoDBDocumentClient.from(client);
@@ -30,10 +35,20 @@ async function relay_eth_message(
 ): Promise<boolean> {
   const { original_path: path, message_bytes, circle_attestation } = message;
 
-  const account = LocalAccountSigner.mnemonicToAccountSigner(
-    process.env.DESTINATION_CALLER!
-  );
+  const mnemonic = process.env.DESTINATION_CALLER_API_KEY?.split("-").join(" ");
+  const account = LocalAccountSigner.mnemonicToAccountSigner(mnemonic!);
   const proxy = PROXY_CONTRACTS[path.to_chain];
+
+  const pimlico_paymaster = createClient({
+    chain: VIEM_NETWORKS[path.to_chain]!,
+    transport: http(
+      get_pimlico_paymaster_for_chain(
+        path.to_chain,
+        process.env.PIMLICO_API_KEY!
+      )
+    ),
+    // @ts-expect-error it is not infering type correctly
+  }).extend(pimlicoPaymasterActions(ENTRYPOINT_ADDRESS_V07));
 
   const viem_client = await createLightAccountAlchemyClient({
     apiKey: process.env.ALCHEMY_API_KEY!,
@@ -43,6 +58,22 @@ async function relay_eth_message(
     accountAddress: proxy?.address as Address,
     version: "v2.0.0",
     useSimulation: true,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    customMiddleware: async (userop, _) => {
+      const res = await pimlico_paymaster.sponsorUserOperation({
+        userOperation: {
+          ...userop,
+          factory: undefined,
+          factoryData: undefined,
+          callData: await userop.callData,
+          nonce: await userop.nonce,
+        },
+      });
+      return {
+        ...userop,
+        ...res,
+      };
+    },
   });
 
   const options = new PathwayOptions({ viem_client });
@@ -64,17 +95,9 @@ async function relay_eth_message(
   }
 
   try {
-    const slope = pathway.get_fee_for_usdc_amount(path.amount);
-    const gas_used = await viem_client.estimateContractGas({
-      address: proxy?.address as Address,
-      abi: proxy?.abi as Abi,
-      functionName: "receiveMessage",
-      args: [path.receiver_address, message_bytes, circle_attestation, slope],
-    });
-    const gas_in_usdc = await pathway.get_usd_quote_for_wei(gas_used);
-    const total_fee = slope + gas_in_usdc;
+    const total_fee = await pathway.estimate_receive_message_eth(message);
 
-    const { hash: uoHash } = await viem_client.sendUserOperation({
+    const { hash } = await viem_client.sendUserOperation({
       uo: {
         target: proxy?.address as Address,
         data: encodeFunctionData({
@@ -84,14 +107,14 @@ async function relay_eth_message(
             path.receiver_address,
             message_bytes,
             circle_attestation,
-            total_fee,
+            total_fee.gas.amount,
           ],
         }),
         value: 0n,
       },
     });
 
-    await viem_client.waitForUserOperationTransaction({ hash: uoHash });
+    await viem_client.waitForUserOperationTransaction({ hash });
   } catch (error) {
     return false;
   }
@@ -118,7 +141,9 @@ async function relay_noble_message(
 
   try {
     await pathway.receive_message_noble(message, {
-      outside_caller: (await account.getAccounts())[0].address,
+      outside_caller: (
+        await account.getAccounts()
+      )[0].address as `noble1${string}`,
     });
     return true;
   } catch (error) {

@@ -1,13 +1,18 @@
 org: peteruche21
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+app: pathway
 service: pathway
-
-frameworkVersion: "4"
 
 custom: ${file(./env.yml)}
 
 stages:
   default:
     params:
+      # sqs parameters
+      attestationQueueName: ${self:service}-${sls:stage}-attestation-queue
+      relayQueueName: ${self:service}-${sls:stage}-relay-queue
+      retryQueueName: ${self:service}-${sls:stage}-retry-queue
+      # dynamodb parameters
       msgTableName: "${self:service}-${sls:stage}-messages"
       apiKeyTableName: "${self:service}-${sls:stage}-api-keys"
       # custom parameters
@@ -15,8 +20,9 @@ stages:
       client_id: ${self:custom.clientId}
       apitoolkitSecret: ${self:custom.apiToolkitSecret}
       nobleRpcUrl: ${self:custom.nobleRpcUrl}
-      destinationCaller: ${self:custom.destinationCaller}
+      destinationCallerApiKey: ${self:custom.destinationCallerApiKey}
       alchemyApiKey: ${self:custom.alchemyApiKey}
+      pimlicoApiKey: ${self:custom.pimlicoApiKey}
 
 provider:
   name: aws
@@ -50,13 +56,14 @@ provider:
   environment:
     MESSAGE_TABLE: ${param:msgTableName}
     API_KEY_TABLE: ${param:apiKeyTableName}
-    ATTESTATION_QUEUE_URL: ${param:attestationQueueName}
-    RELAY_QUEUE_URL: ${param:relayQueueName}
-    RETRY_QUEUE_URL: ${param:retryQueueName}
+    ATTESTATION_QUEUE_URL: https://sqs.${aws:region}.amazonaws.com/${aws:accountId}/${param:attestationQueueName}
+    RELAY_QUEUE_URL: https://sqs.${aws:region}.amazonaws.com/${aws:accountId}/${param:relayQueueName}
+    RETRY_QUEUE_URL: https://sqs.${aws:region}.amazonaws.com/${aws:accountId}/${param:retryQueueName}
     APITOOLKIT_API_KEY: ${param:apitoolkitSecret}
     NOBLE_RPC_URL: ${param:nobleRpcUrl}
-    DESTINATION_CALLER: ${param:destinationCaller}
+    DESTINATION_CALLER_API_KEY: ${param:destinationCallerApiKey}
     ALCHEMY_API_KEY: ${param:alchemyApiKey}
+    PIMLICO_API_KEY: ${param:pimlicoApiKey}
 
   httpApi:
     authorizers:
@@ -72,34 +79,34 @@ provider:
 
 functions:
   authorizer:
-      handler: @/relayer/authorizer.handler
+    handler: "@/relayer/authorizer.handler"
 
   scheduler:
-      handler: @/relayer/scheduler.handler
-      events:
-        - schedule: rate(1 minute)
+    handler: "@/relayer/scheduler.handler"
+    events:
+      - schedule: rate(1 minute)
 
   api:
-    handler: @/relayer/index.handler
+    handler: "@/relayer/index.handler"
     events:
       - httpApi:
           path: /message/new/{tx_hash}
           method: POST
-          authorizer: 
+          authorizer:
             name: lambdaAuthorizer
       - httpApi:
           path: /message/status/{tx_hash}
           method: GET
-          authorizer: 
+          authorizer:
             name: lambdaAuthorizer
       - httpApi:
           path: /create-api-key
           method: POST
-          authorizer: 
+          authorizer:
             name: jwtAuthorizer
 
   attestation:
-    handler: @/relayer/attestation.handler
+    handler: "@/relayer/attestation.handler"
     events:
       - sqs:
           arn:
@@ -110,7 +117,7 @@ functions:
           batchSize: 10
 
   relay:
-    handler: @/relayer/relay.handler
+    handler: "@/relayer/relay.handler"
     events:
       - sqs:
           arn:
@@ -120,8 +127,8 @@ functions:
           functionResponseType: ReportBatchItemFailures
           batchSize: 10
 
-  retry: 
-    handler: @/relayer/retry.handler
+  retry:
+    handler: "@/relayer/retry.handler"
     events:
       - sqs:
           arn:
@@ -160,14 +167,14 @@ resources:
     AttestationQueue:
       Type: AWS::SQS::Queue
       Properties:
-        QueueName: ${self:service}-${sls:stage}-attestation-queue
+        QueueName: ${param:attestationQueueName}
 
     RelayQueue:
       Type: AWS::SQS::Queue
       Properties:
-        QueueName: ${self:service}-${sls:stage}-relay-queue
+        QueueName: ${param:relayQueueName}
 
     RetryQueue:
       Type: AWS::SQS::Queue
       Properties:
-        QueueName: ${self:service}-${sls:stage}-retry-queue
+        QueueName: ${param:retryQueueName}

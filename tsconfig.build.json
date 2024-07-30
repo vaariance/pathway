@@ -9,6 +9,7 @@
     "./@/contract/**/*.ts",
     "./@/constants/**/*.ts",
     "./@/sdk/**/*.ts",
-    "./@/relayer/**/*.ts"
+    "./@/relayer/**/*.ts",
+    "test.ts"
   ]
 }

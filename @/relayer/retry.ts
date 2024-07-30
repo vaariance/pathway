@@ -6,7 +6,7 @@ import {
   GetCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 import { SQSClient, SendMessageBatchCommand } from "@aws-sdk/client-sqs";
-import { ReceiveMessageFormat } from "./types";
+import { ReceiveMessageFormat } from "./types.js";
 
 const client = new DynamoDBClient();
 const dynamodb_client = DynamoDBDocumentClient.from(client);

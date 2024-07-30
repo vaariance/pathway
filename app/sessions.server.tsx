@@ -1,4 +1,4 @@
-import { createCookieSessionStorage } from "@remix-run/node";
+import { createCookieSessionStorage } from "@remix-run/cloudflare";
 import { createThemeSessionResolver } from "remix-themes";
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -11,7 +11,7 @@ const sessionStorage = createCookieSessionStorage({
     sameSite: "lax",
     secrets: ["s3cr3t"],
 
-    ...(isProduction ? { domain: "pathway.sh", secure: true } : {}),
+    ...(isProduction ? { domain: "thepathway.to", secure: true } : {}),
   },
 });
 

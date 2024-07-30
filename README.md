@@ -38,7 +38,7 @@ to deploy contracts
 # add PRIVATE_KEY="0x..." to .env
 # then run
 
-bun run deploy [mode]
+bun run deploy:contract [mode]
 ```
 
 there are three modes:

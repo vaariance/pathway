@@ -33,7 +33,7 @@ import {
   TOKEN_MESSENGERS,
   USDC_CONTRACTS,
   VIEM_NETWORKS,
-} from "../constants";
+} from "../constants/index.js";
 
 export type SerializableResult<T, E> =
   | {
@@ -105,9 +105,9 @@ export type ExecutionResponse = {
 };
 
 export type ReceiveMessage = {
-  message_bytes: string;
-  message_hash: string;
-  circle_attestation?: string;
+  message_bytes: `0x${string}`;
+  message_hash: `0x${string}`;
+  circle_attestation?: `0x${string}`;
   block_confirmation_in_ms?: number;
   status: "pending" | "attested" | "received" | "failed";
   destination_block_height_at_deposit: bigint;
@@ -353,8 +353,9 @@ export class Pathway<T, R> {
       }
       return start_index;
     };
-    const data = address ? bytes.slice(get_index()) : bytes;
-    return toBech32("noble", data);
+    return address
+      ? toBech32("noble", bytes.slice(get_index()))
+      : Buffer.from(bytes).toString("base64");
   }
 
   /**
@@ -458,6 +459,10 @@ export class Pathway<T, R> {
       PROXY_CONTRACTS[to_chain]!.address as Address
     );
 
+    const destination_caller = this.get_bytes_from_hex(
+      DESTINATION_CALLERS[to_chain] as Address
+    );
+
     const msg = {
       typeUrl: TOKEN_MESSENGERS[from_chain],
       value: {
@@ -466,7 +471,7 @@ export class Pathway<T, R> {
         destinationDomain: DOMAINS[to_chain],
         mintRecipient: receipient,
         burnToken: USDC_CONTRACTS[from_chain],
-        destinationCaller: DESTINATION_CALLERS[to_chain],
+        destinationCaller: destination_caller,
       },
     };
 
@@ -593,17 +598,15 @@ export class Pathway<T, R> {
     {
       simulate_only = false,
       outside_caller,
-    }: { simulate_only?: boolean; outside_caller?: string }
+    }: { simulate_only?: boolean; outside_caller?: `noble1${string}` }
   ): Promise<ExecutionResponse> {
     const {
       message_bytes,
       circle_attestation,
       original_path: path,
     } = receive_message;
-    const message = new Uint8Array(Buffer.from(message_bytes.slice(2), "hex"));
-    const attestation = new Uint8Array(
-      Buffer.from(circle_attestation!.slice(2), "hex")
-    );
+    const message = this.get_bytes_from_hex(message_bytes, false);
+    const attestation = this.get_bytes_from_hex(circle_attestation!, false);
 
     const client = await this.get_noble_wallet_client();
     const caller = outside_caller ?? DESTINATION_CALLERS[path!.to_chain];
@@ -721,6 +724,7 @@ export class Pathway<T, R> {
       abi: proxy?.abi as Abi,
       functionName: "receiveMessage",
       args: [path!.receiver_address, message_bytes, circle_attestation, slope],
+      account: proxy?.address as Address,
     });
 
     const gas_in_usdc = await this.get_usd_quote_for_wei(
@@ -749,6 +753,7 @@ export class Pathway<T, R> {
    */
   async submit_pending(
     receive_message: ReceiveMessage,
+    hash: string,
     api_key: string
   ): Promise<void> {
     const values = Object.values(receive_message);
@@ -763,12 +768,12 @@ export class Pathway<T, R> {
     }
 
     const axios_instance = axios.create({
-      baseURL: "https://api.pathway.money/v1",
-      headers: {
-        "x-api-key": api_key,
-      },
+      baseURL: "https://api.thepathway.to",
     });
-    await axios_instance.post("/pending", receive_message);
+    await axios_instance.post(
+      `/message/new/${hash}?api_key=${api_key}`,
+      receive_message
+    );
   }
 
   /**
@@ -818,6 +823,7 @@ export class Pathway<T, R> {
         block_confirmation_in_ms: SOURCE_CHAIN_CONFIRMATIONS[path.from_chain],
         original_path: path,
       },
+      execution_response.hash!,
       api_key
     );
 
@@ -898,22 +904,28 @@ export class Pathway<T, R> {
    * @return {bigint} The fee in usdc for the given amount.
    */
   public get_fee_for_usdc_amount(amount_wei: bigint): bigint {
-    const flat_rate_wei = BigInt(0.08 * 1e6);
-    const max_fee_wei = BigInt(2.3 * 1e6);
+    // additional 0.01 for paymaster costs
+    const flat_rate_wei = BigInt(0.09 * 1e6);
+    const max_fee_wei = BigInt(0.81 * 1e6);
+
     const min_amount_wei = BigInt(10 * 1e6);
     const max_amount_wei = BigInt(15000 * 1e6);
 
     const slope =
-      (max_fee_wei - flat_rate_wei) / (max_amount_wei - min_amount_wei);
+      Number(max_fee_wei - flat_rate_wei) /
+      Number(max_amount_wei - min_amount_wei);
 
     let fee_wei: bigint;
+
     if (amount_wei <= min_amount_wei) {
       fee_wei = flat_rate_wei;
     } else {
-      fee_wei = flat_rate_wei + slope * (amount_wei - min_amount_wei);
+      fee_wei =
+        flat_rate_wei +
+        BigInt(Math.floor(slope * Number(amount_wei - min_amount_wei)));
     }
 
-    return fee_wei;
+    return fee_wei > max_fee_wei ? max_fee_wei : fee_wei;
   }
 
   /**
@@ -927,16 +939,18 @@ export class Pathway<T, R> {
     const client = this.get_ethereum_client(chain);
 
     const round_data = await client.readContract({
-      address: ETH_USD_PRICE_FEEDS[client.chain!.name],
+      address: ETH_USD_PRICE_FEEDS[chain ?? client.chain!.name.toLowerCase()],
       abi: AGGREGATOR_V3_INTERFACE,
       functionName: "latestRoundData",
     });
 
     const price_of_eth_in_usd = BigInt(round_data[1]);
-    const eth_value = wei / BigInt(10 ** 18);
-    const usd_value =
-      (eth_value * BigInt(price_of_eth_in_usd)) / BigInt(10 ** 8);
 
-    return usd_value * BigInt(10 ** 6);
+    // Convert to float for more precise calculation
+    const eth_value = Number(wei) / 1e18;
+    const usd_value = (eth_value * Number(price_of_eth_in_usd)) / 1e8;
+
+    // Convert back to bigint, scaling up by 1e6 for 6 decimal places of precision
+    return BigInt(Math.round(usd_value * 1e6));
   }
 }

@@ -12,7 +12,7 @@ import express from "express";
 import { decode, JwtPayload } from "jsonwebtoken";
 import serverless from "serverless-http";
 import { v4 as uuidv4 } from "uuid";
-import { ReceiveMessageFormat } from "./types";
+import { ReceiveMessageFormat } from "./types.js";
 
 const app = express();
 
