@@ -44,6 +44,8 @@ export default defineConfig({
   resolve: {
     alias: {
       buffer: "buffer",
+      crypto: "node:crypto",
+      stream: "node:stream",
     },
   },
 

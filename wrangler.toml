@@ -1,0 +1,4 @@
+name = "pathway"
+pages_build_output_dir = "./build"
+compatibility_date = "2024-07-30"
+compatibility_flags = ["nodejs_compat"]
