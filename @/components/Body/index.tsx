@@ -453,7 +453,7 @@ function AddressSelection({
           name="address"
           className="flex-grow"
           placeholder={`${path?.to?.value} address${
-            path?.to?.type === "ethereum" && " or ens"
+            path?.to?.type === "ethereum" ? " or ens" : ""
           }`}
           value={path.receiver}
           onChange={handle_change}

@@ -10,6 +10,8 @@ bun run dev
 
 ## Deployment
 
+### Using worker sites
+
 First, build your app for production:
 
 ```sh
@@ -19,7 +21,33 @@ bun run build
 Then run the app in production mode:
 
 ```sh
-bun run start
+bun run preview
+```
+
+deploy to cf workers
+
+```sh
+bun run release
+```
+
+### Using CF pages
+
+First, build your app for production:
+
+```sh
+bun run pages:build
+```
+
+Then run the app in production mode:
+
+```sh
+bun run pages:preview
+```
+
+deploy to cf pages
+
+```sh
+bun run pages:release
 ```
 
 ### contracts
@@ -30,6 +58,12 @@ to build contracts
 
 ```sh
 bun run forge:build
+```
+
+to build deployer script
+
+```sh
+bun run build:contract
 ```
 
 to deploy contracts
@@ -50,7 +84,7 @@ there are three modes:
 to deploy to multiple modes
 
 ```sh
-bun run deploy <mode1> <mode2> <mode3>
+bun run deploy:contract <mode1> <mode2> <mode3>
 ```
 
 ### installing packages

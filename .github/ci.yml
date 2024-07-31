@@ -1,0 +1,26 @@
+name: Release-worker
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: deploy
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: install deps
+        run: bun install
+
+      - name: build worker
+        run: bun run build
+
+      - name: release
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

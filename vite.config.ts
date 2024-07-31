@@ -37,7 +37,7 @@ export default defineConfig({
       },
     },
     visualizer({
-      open: true,
+      open: false,
       gzipSize: true,
       brotliSize: true,
     }),
@@ -73,6 +73,9 @@ export default defineConfig({
       ],
       output: {
         manualChunks: (id) => {
+          if (id.includes("libsodium-sumo")) {
+            return "libsodium-sumo";
+          }
           if (id.includes("cosmjs-types")) {
             return "cosmjs-types";
           }

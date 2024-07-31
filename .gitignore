@@ -13,3 +13,4 @@ env.yml
 .wrangler
 /misc/cloudflare-pages/build
 .release/
+stats.html
