@@ -12,9 +12,12 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
-      - name: install and build deps
-        uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@v2
+
+      - name: install deps
         run: bun install
+
+      - name: build worker
         run: bun run build
 
       - name: release

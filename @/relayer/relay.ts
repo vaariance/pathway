@@ -30,12 +30,13 @@ const client = new DynamoDBClient();
 const dynamodb_client = DynamoDBDocumentClient.from(client);
 const sqs_client = new SQSClient();
 
+const mnemonic = process.env.DESTINATION_CALLER_API_KEY?.split("-").join(" ");
+
 async function relay_eth_message(
   message: ReceiveMessageFormat
 ): Promise<boolean> {
   const { original_path: path, message_bytes, circle_attestation } = message;
 
-  const mnemonic = process.env.DESTINATION_CALLER_API_KEY?.split("-").join(" ");
   const account = LocalAccountSigner.mnemonicToAccountSigner(mnemonic!);
   const proxy = PROXY_CONTRACTS[path.to_chain];
 
@@ -125,12 +126,9 @@ async function relay_eth_message(
 async function relay_noble_message(
   message: ReceiveMessageFormat
 ): Promise<boolean> {
-  const account = await DirectSecp256k1HdWallet.fromMnemonic(
-    process.env.DESTINATION_CALLER!,
-    {
-      prefix: "noble",
-    }
-  );
+  const account = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic, {
+    prefix: "noble",
+  });
   const noble_client = await SigningStargateClient.connectWithSigner(
     process.env.NOBLE_RPC_URL!,
     account
