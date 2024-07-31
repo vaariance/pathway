@@ -11,3 +11,5 @@ env.yml
 ./test.js
 .dev.vars
 .wrangler
+/misc/cloudflare-pages/build
+.release/

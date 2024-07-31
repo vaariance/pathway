@@ -9,6 +9,8 @@ import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfil
 import { installGlobals } from "@remix-run/node";
 import rollupNodePolyFill from "rollup-plugin-node-polyfills";
 
+import { visualizer } from "rollup-plugin-visualizer";
+
 installGlobals();
 
 export default defineConfig({
@@ -22,17 +24,33 @@ export default defineConfig({
       },
     }),
     tsconfigPaths(),
+    {
+      name: "local:exclude-remix-optimizeDeps",
+      enforce: "post",
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      config(config, _env) {
+        if (config.optimizeDeps?.include) {
+          config.optimizeDeps.include = config.optimizeDeps.include.filter(
+            (v) => v !== "@remix-run/node"
+          );
+        }
+      },
+    },
+    visualizer({
+      open: true,
+      gzipSize: true,
+      brotliSize: true,
+    }),
   ],
   esbuild: {
     platform: "node",
   },
   optimizeDeps: {
+    include: ["cosmjs-types", "@cosmos-kit", "wagmi", "viem"],
     esbuildOptions: {
-      // Node.js global to browser globalThis
       define: {
         global: "globalThis",
       },
-      // Enable esbuild polyfill plugins
       plugins: [
         NodeGlobalsPolyfillPlugin({
           buffer: true,
@@ -44,8 +62,6 @@ export default defineConfig({
   resolve: {
     alias: {
       buffer: "buffer",
-      crypto: "node:crypto",
-      stream: "node:stream",
     },
   },
 
@@ -55,6 +71,14 @@ export default defineConfig({
         // @ts-expect-error n/a
         rollupNodePolyFill(),
       ],
+      output: {
+        manualChunks: (id) => {
+          if (id.includes("cosmjs-types")) {
+            return "cosmjs-types";
+          }
+        },
+      },
     },
+    chunkSizeWarningLimit: 1000,
   },
 });

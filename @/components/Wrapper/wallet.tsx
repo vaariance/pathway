@@ -1,7 +1,7 @@
 import { ReactElement, useEffect, useState } from "react";
 import { useAccount, useDisconnect, useEnsAvatar, useEnsName } from "wagmi";
 import { EVMConnector as _EVMConnector } from "../Header/evm";
-import { useChain, useNameService } from "@cosmos-kit/react";
+import { useChain, useNameService } from "@cosmos-kit/react-lite";
 import { useLocation } from "@remix-run/react";
 import { Button } from "@/components/ui/button";
 import { Wallet2 } from "lucide-react";

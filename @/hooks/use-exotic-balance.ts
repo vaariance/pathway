@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
 import { StargateClient } from "@cosmjs/stargate";
-import { useChain } from "@cosmos-kit/react";
+import { useChain } from "@cosmos-kit/react-lite";
 import { useAccount, useBalance, useChainId } from "wagmi";
-import { assets } from "chain-registry";
+import { assets } from "@/constants/registry";
 import { AssetsList } from "@/constants/.";
 
 export const useExoticBalance = (mode: string) => {

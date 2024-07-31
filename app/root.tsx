@@ -20,16 +20,15 @@ import clsx from "clsx";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider } from "wagmi";
-import { config, project_id } from "./config";
+import { config } from "./config";
 
 import { ChainProvider } from "@cosmos-kit/react-lite";
-import { chains, assets } from "chain-registry";
-import { wallets as keplrWallets } from "@cosmos-kit/keplr";
+import { chains, assets } from "@/constants/registry";
+// import { wallets as keplrWallets } from "@cosmos-kit/keplr";
 import { wallets as cosmostationWallets } from "@cosmos-kit/cosmostation";
 import { wallets as leapwallets } from "@cosmos-kit/leap";
 import { wallets as compass } from "@cosmos-kit/compass";
 
-import "@interchain-ui/react/styles";
 import { ExoticDialogCosmos } from "@/components/ui/exotic-dialog";
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -71,12 +70,11 @@ export default function App() {
           chains={chains}
           assetLists={assets}
           wallets={[
-            ...keplrWallets,
+            // keplrWallets[0],
             cosmostationWallets[0],
-            ...leapwallets.slice(0, 2),
+            leapwallets[0],
             ...compass,
           ]}
-          walletConnectOptions={{ signClient: { projectId: project_id } }}
           walletModal={ExoticDialogCosmos}
         >
           <WagmiProvider config={config}>

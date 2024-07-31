@@ -69,28 +69,32 @@ export const chain_data: ChainMetadata[] = [
   {
     value: "noble",
     name: "Noble",
-    img_src: "/noble.svg",
+    img_src:
+      "https://raw.githubusercontent.com/cosmos/chain-registry/8304df2430e1d3418bb2102ac76af5a138141216/noble/images/stake.svg",
     fallback: "NB",
     type: "noble",
   },
   {
     value: "ethereum",
     name: "Ethereum",
-    img_src: "/eth.png",
+    img_src:
+      "https://ethereum.org/_next/static/media/eth-diamond-purple.7929ed26.png",
     fallback: "ETH",
     type: "ethereum",
   },
   {
     value: "arbitrum",
     name: "Arbitrum",
-    img_src: "/arb.svg",
+    img_src:
+      "https://raw.githubusercontent.com/cosmos/chain-registry/b1b4708aa3ddb10b397e002e4271266234acb7cc/_non-cosmos/arbitrum/images/arb.svg",
     fallback: "ARB",
     type: "ethereum",
   },
   {
     value: "base",
     name: "Base",
-    img_src: "/base.svg",
+    img_src:
+      "https://raw.githubusercontent.com/base-org/brand-kit/8984fe6e08be3058fd7cf5cd0b201f8b92b5a70e/logo/in-product/Base_Network_Logo.svg",
     fallback: "OP",
     type: "ethereum",
   },

@@ -21,7 +21,7 @@ export const CosmosConnector: FC<
   };
   const get_name = (name: string) => {
     const array = name.split("-");
-    return array.includes("mobile") ? array[0] + " mobile" : array[0];
+    return array[0];
   };
   return (
     <ScrollArea className="max-h-[380px] w-full">

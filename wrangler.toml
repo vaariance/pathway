@@ -1,4 +1,11 @@
 name = "pathway"
-pages_build_output_dir = "./build"
-compatibility_date = "2024-07-30"
-compatibility_flags = ["nodejs_compat"]
+
+main = "./app/server.mjs"
+assets = "./build/client"
+workers_dev = true
+compatibility_date = "2023-04-20"
+
+minify = true
+node_compat = true
+
+route = { pattern = "thepathway.to", zone_name = "thepathway.to", custom_domain = true }

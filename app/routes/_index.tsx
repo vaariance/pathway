@@ -1,9 +1,9 @@
 import { Body } from "@/components/Body";
 import Header from "@/components/Header";
 import PathwayBackground from "@/components/ui/path";
-import type { MetaFunction } from "@remix-run/cloudflare";
+import type { ServerRuntimeMetaFunction } from "@remix-run/server-runtime";
 
-export const meta: MetaFunction = () => {
+export const meta: ServerRuntimeMetaFunction = () => {
   return [
     { title: "Pathway - USDC Bridge" },
     { name: "description", content: "Noble to Ethereum USDC Bridge" },
