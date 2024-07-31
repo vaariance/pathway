@@ -27,7 +27,6 @@
     "@aws-sdk/client-lambda": "^3.616.0",
     "@aws-sdk/client-sqs": "^3.616.0",
     "@aws-sdk/lib-dynamodb": "^3.616.0",
-    "@cosmos-kit/compass": "^2.11.2",
     "@cosmos-kit/cosmostation": "^2.11.2",
     "@cosmos-kit/keplr": "^2.12.2",
     "@cosmos-kit/leap": "^2.12.2",

@@ -27,7 +27,6 @@ import { chains, assets } from "@/constants/registry";
 import { wallets as keplrWallets } from "@cosmos-kit/keplr";
 import { wallets as cosmostationWallets } from "@cosmos-kit/cosmostation";
 import { wallets as leapwallets } from "@cosmos-kit/leap";
-import { wallets as compass } from "@cosmos-kit/compass";
 
 import { ExoticDialogCosmos } from "@/components/ui/exotic-dialog";
 
@@ -66,12 +65,7 @@ function Providers({ children }: { children: React.ReactNode }) {
     <ChainProvider
       chains={chains}
       assetLists={assets}
-      wallets={[
-        keplrWallets[0],
-        cosmostationWallets[0],
-        leapwallets[0],
-        ...compass,
-      ]}
+      wallets={[keplrWallets[0], cosmostationWallets[0], leapwallets[0]]}
       walletModal={ExoticDialogCosmos}
     >
       <WagmiProvider config={config}>

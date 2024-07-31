@@ -10,7 +10,10 @@ node_compat = true
 
 vars = {ENVIRONMENT = "production"}
 
-route = { pattern = "app.thepathway.to", zone_name = "thepathway.to", custom_domain = true }
+route = { pattern = "app.thepathway.to", custom_domain = true }
 
 [site]
 bucket = "build/client"
+
+[limits]
+cpu_ms = 30000
