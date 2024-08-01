@@ -9,8 +9,26 @@ import { wallets as keplrwallets } from "@cosmos-kit/keplr-extension";
 
 import { ExoticDialogCosmos } from "@/components/ui/exotic-dialog";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { WagmiProvider } from "wagmi";
-import { config } from "./config";
+
+import { http, createConfig, WagmiProvider } from "wagmi";
+import { base, mainnet, arbitrum } from "wagmi/chains";
+import { injected, walletConnect, coinbaseWallet } from "wagmi/connectors";
+
+export const project_id = "5874215139e2bf179decb72ddbd9197d";
+
+const config = createConfig({
+  chains: [mainnet, arbitrum, base],
+  connectors: [
+    coinbaseWallet(),
+    injected(),
+    walletConnect({ projectId: project_id }),
+  ],
+  transports: {
+    [mainnet.id]: http(),
+    [arbitrum.id]: http(),
+    [base.id]: http(),
+  },
+});
 
 const queryClient = new QueryClient();
 
