@@ -17,8 +17,7 @@ import {
 } from "@/components/ui/drawer";
 import { FC, PropsWithChildren, useState } from "react";
 import { Wallet2 } from "lucide-react";
-import { WalletModalProps } from "@cosmos-kit/core";
-import { CosmosConnector } from "../Header/cosmos";
+import { CosmosConnector, WalletModalProps } from "../Header/cosmos";
 
 type ExoticDialogProps = FC<
   PropsWithChildren<Partial<WalletModalProps & { theme: unknown }>>

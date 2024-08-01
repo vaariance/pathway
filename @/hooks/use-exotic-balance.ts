@@ -1,5 +1,4 @@
 import { useState, useMemo } from "react";
-import { StargateClient } from "@cosmjs/stargate";
 import { useChain } from "@cosmos-kit/react-lite";
 import { useAccount, useBalance, useChainId } from "wagmi";
 import { assets } from "@/constants/registry";
@@ -7,8 +6,13 @@ import { AssetsList } from "@/constants/.";
 
 export const useExoticBalance = (mode: string) => {
   const [cosmos_balance, set_cosmos_balance] = useState<bigint>(BigInt(0));
-  const { address, getRpcEndpoint, isWalletConnected, chain } =
-    useChain("noble");
+  const {
+    address,
+    getRpcEndpoint,
+    isWalletConnected,
+    chain,
+    getStargateClient,
+  } = useChain("noble");
 
   const chain_id = useChainId();
   const { address: eth_address, isConnected } = useAccount();
@@ -31,13 +35,8 @@ export const useExoticBalance = (mode: string) => {
         return;
       }
 
-      let rpc_endpoint = await getRpcEndpoint();
-      if (!rpc_endpoint) {
-        rpc_endpoint = `https://noble-rpc.polkachu.com/`;
-      }
-
       try {
-        const client = await StargateClient.connect(rpc_endpoint);
+        const client = await getStargateClient();
         const balance = await client.getBalance(address, coin.base);
         const exp = coin.denom_units.find((unit) => unit.denom === coin.display)
           ?.exponent as number;

@@ -73,8 +73,8 @@ export default defineConfig({
       ],
       output: {
         manualChunks: (id) => {
-          if (id.includes("libsodium-sumo")) {
-            return "libsodium-sumo";
+          if (id.includes("libsodium-wrappers-sumo")) {
+            return "libsodium-wrappers-sumo";
           }
           if (id.includes("cosmjs-types")) {
             return "cosmjs-types";

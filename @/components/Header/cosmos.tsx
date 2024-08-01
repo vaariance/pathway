@@ -2,16 +2,28 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { Button } from "@/components/ui/button";
-import { FC, Fragment, useState } from "react";
-import { WalletModalProps, ChainWalletBase } from "@cosmos-kit/core";
+import { Dispatch, FC, Fragment, useState } from "react";
 import { Loader2 } from "lucide-react";
+
+export interface WalletModalProps {
+  isOpen: boolean;
+  setOpen: Dispatch<boolean>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  walletRepo?: any;
+}
+
+export type Connector = {
+  walletName: string;
+  walletInfo: { logo?: unknown };
+  connect: (sync?: boolean) => Promise<void>;
+};
 
 export const CosmosConnector: FC<
   Partial<WalletModalProps> & { on_click?: () => void }
 > = ({ walletRepo: wallet_repo, on_click }) => {
   const [loading, set_loading] = useState<Record<string, boolean>>({});
 
-  const handle_connect = async (connector: ChainWalletBase) => {
+  const handle_connect = async (connector: Connector) => {
     set_loading((prev) => ({ ...prev, [connector.walletName]: true }));
     try {
       await connector.connect().then(on_click);
@@ -21,12 +33,12 @@ export const CosmosConnector: FC<
   };
   const get_name = (name: string) => {
     const array = name.split("-");
-    return array[0];
+    return array.includes("mobile") ? array[0] + " mobile" : array[0];
   };
   return (
     <ScrollArea className="max-h-[380px] w-full">
       <div className="px-12 py-8 md:p-4 flex flex-col space-y-4">
-        {wallet_repo?.wallets.map((connector) => (
+        {wallet_repo?.wallets.map((connector: Connector) => (
           <Button
             disabled={loading[connector.walletName]}
             variant={"ghost"}

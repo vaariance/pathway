@@ -18,17 +18,9 @@ import { themeSessionResolver } from "./sessions.server";
 import { LoaderFunctionArgs } from "@remix-run/cloudflare";
 import clsx from "clsx";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { WagmiProvider } from "wagmi";
-import { config } from "./config";
+import { lazy } from "react";
 
-import { ChainProvider } from "@cosmos-kit/react-lite";
-import { chains, assets } from "@/constants/registry";
-import { wallets as keplrWallets } from "@cosmos-kit/keplr";
-import { wallets as cosmostationWallets } from "@cosmos-kit/cosmostation";
-import { wallets as leapwallets } from "@cosmos-kit/leap";
-
-import { ExoticDialogCosmos } from "@/components/ui/exotic-dialog";
+const LazyProviders = lazy(() => import("./providers"));
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { getTheme } = await themeSessionResolver(request);
@@ -58,33 +50,15 @@ function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-const queryClient = new QueryClient();
-
-function Providers({ children }: { children: React.ReactNode }) {
-  return (
-    <ChainProvider
-      chains={chains}
-      assetLists={assets}
-      wallets={[keplrWallets[0], cosmostationWallets[0], leapwallets[0]]}
-      walletModal={ExoticDialogCosmos}
-    >
-      <WagmiProvider config={config}>
-        <QueryClientProvider client={queryClient}>
-          {children}
-        </QueryClientProvider>
-      </WagmiProvider>
-    </ChainProvider>
-  );
-}
-
 export default function App() {
   const data = useLoaderData<typeof loader>();
   return (
     <ThemeProvider specifiedTheme={data.theme} themeAction="/action/set-theme">
       <Layout>
-        <Providers>
+        {/* todo: add suspense */}
+        <LazyProviders>
           <Outlet />
-        </Providers>
+        </LazyProviders>
       </Layout>
     </ThemeProvider>
   );
