@@ -2,6 +2,7 @@ import {
   Dispatch,
   ReactElement,
   SetStateAction,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -35,12 +36,13 @@ export const Wrapper = <T extends Element>({ children }: WrapperProps<T>) => {
   const [chain, set_chain] = useState<ChainMetadata | null>(null);
   const [amount, set_amount] = useState<string>("0");
   const [address, set_address] = useState<string>("");
-  const [accepted, set_accepted] = useState(() => {
+  const [accepted, set_accepted] = useState(true);
+
+  useEffect(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("noble-path-tcs-accepted") === "true";
+      set_accepted(localStorage.getItem("noble-path-tcs-accepted") === "true");
     }
-    return false;
-  });
+  }, []);
 
   const _set_error = (error: Record<string, unknown> | null) => {
     error && set_error((prev) => ({ ...prev, ...error }));

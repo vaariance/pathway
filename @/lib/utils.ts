@@ -16,5 +16,5 @@ export function validate_address(address: string): string | null {
     address.endsWith(".eth") ||
     (address.startsWith("noble1") && address.length === 44);
 
-  return valid ? null : "invalid address or ens";
+  return valid ? null : "invalid address";
 }

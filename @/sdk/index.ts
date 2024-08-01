@@ -1,7 +1,6 @@
 import { coin } from "@cosmjs/amino";
 import { fromBech32, toBech32 } from "@cosmjs/encoding";
 import { SigningStargateClient, StargateClient } from "@cosmjs/stargate";
-import { WalletClient as CosmoskitWalletClient } from "@cosmos-kit/core";
 import axios from "axios";
 import {
   Abi,
@@ -11,10 +10,10 @@ import {
   keccak256,
   parseEventLogs,
   PublicActions,
-  PublicClient,
   toHex,
-  WalletClient,
+  Client,
   WriteContractParameters,
+  WalletActions,
 } from "viem";
 import { normalize } from "viem/ens";
 import {
@@ -115,13 +114,13 @@ export type ReceiveMessage = {
   original_path?: Path;
 };
 
-export type ViemWalletClient<T> = T extends PublicClient
-  ? PublicClient
-  : WalletClient & PublicActions;
+export type ViemWalletClient<T> = T extends WalletActions
+  ? Client & T & PublicActions
+  : Client & T;
 
-export type CosmosWalletClient<R> = R extends CosmoskitWalletClient
-  ? CosmoskitWalletClient
-  : SigningStargateClient;
+export type CosmosWalletClient<R> = R extends SigningStargateClient
+  ? SigningStargateClient
+  : StargateClient;
 
 export type PathwayClient<T, R> = ViemWalletClient<T> | CosmosWalletClient<R>;
 
@@ -190,7 +189,7 @@ export class Pathway<T, R> {
    */
   private get_ethereum_client(chain?: Chains) {
     if (this.options?.viem_client) {
-      return this.get_ethereum_wallet_client();
+      return this.options.viem_client as T & ViemWalletClient<PublicActions>;
     }
     if (chain) {
       return createPublicClient({
@@ -198,43 +197,60 @@ export class Pathway<T, R> {
         transport: http(),
       });
     }
-    throw new Error("Viem client is not provided");
+    throw new Error("Viem client is not provided and chain is not specified");
   }
 
-  private get_ethereum_wallet_client() {
-    if (this.options?.viem_client) {
-      return this.options.viem_client as T & WalletClient & PublicActions;
+  /**
+   * Retrieves the Ethereum wallet client.
+   *
+   * @return {ViemWalletClient<WalletActions>} The Ethereum wallet client.
+   * @throws {Error} If the Viem wallet client is not provided or does not have wallet capabilities.
+   */
+  private get_ethereum_wallet_client(): ViemWalletClient<WalletActions> {
+    if (!this.options?.viem_client) {
+      throw new Error("Viem wallet client is not provided");
     }
-    throw new Error("Viem wallet client is not provided");
+
+    if (
+      typeof this.options.viem_client === "object" &&
+      "writeContract" in this.options.viem_client
+    ) {
+      return this.options.viem_client as T & ViemWalletClient<WalletActions>;
+    }
+
+    throw new Error("Viem wallet client does not have wallet capabilities");
   }
 
   /**
    * Retrieves the Noble client.
    *
-   * @return {Promise<SigningStargateClient>} The Noble client.
+   * @return {Promise<StargateClient>} The Noble client.
    * @throws {Error} If the Noble client is not available or if the Noble client expects an offline signer.
    */
   private async get_noble_client() {
     if (this.options?.noble_client) {
-      return await this.get_noble_wallet_client();
+      return this.options.noble_client as R &
+        CosmosWalletClient<StargateClient>;
     }
-    return await StargateClient.connect(NOBLE_RPC);
+    return StargateClient.connect(NOBLE_RPC);
   }
 
+  /**
+   * Retrieves the Noble wallet client.
+   *
+   * @return {Promise<SigningStargateClient>} The Noble wallet client.
+   * @throws {Error} If the Noble client is not provided or if it is not an instance of SigningStargateClient.
+   */
   private async get_noble_wallet_client() {
-    if (this.options?.noble_client === undefined) {
+    if (!this.options?.noble_client) {
       throw new Error("Noble client is not provided");
     }
-    if (this.options.noble_client instanceof SigningStargateClient) {
-      return this.options.noble_client;
+    if (!(this.options.noble_client instanceof SigningStargateClient)) {
+      throw new Error(
+        "Noble client is provided but is not a SigningStargateClient"
+      );
     }
-    const client = this.options.noble_client as R & CosmoskitWalletClient;
-    const offline_signer = client.getOfflineSigner;
-    if (offline_signer === undefined) {
-      throw new Error("Noble client expects an offline signer");
-    }
-    const signer = await offline_signer("noble-1");
-    return await SigningStargateClient.connectWithSigner(NOBLE_RPC, signer);
+    return this.options.noble_client;
   }
 
   private async get_allowance(path: Path): Promise<boolean> {

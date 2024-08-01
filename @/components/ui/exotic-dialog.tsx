@@ -8,16 +8,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer";
-import { FC, PropsWithChildren, useState } from "react";
+
+import { FC, lazy, PropsWithChildren, useState, memo } from "react";
 import { Wallet2 } from "lucide-react";
 import { CosmosConnector, WalletModalProps } from "../Header/cosmos";
+
+const LazyDrawer = lazy(async () => await import("./exotic-drawer"));
+const MemoizedDrawer = memo(LazyDrawer);
 
 type ExoticDialogProps = FC<
   PropsWithChildren<Partial<WalletModalProps & { theme: unknown }>>
@@ -49,7 +46,10 @@ export const ExoticDialog: ExoticDialogProps = ({ children, ...props }) => {
       <Dialog open={is_open} onOpenChange={handle_change}>
         {!props.setOpen && <DialogTrigger asChild>{trigger}</DialogTrigger>}
 
-        <DialogContent className="sm:max-w-xs border-primary-foreground">
+        <DialogContent
+          className="sm:max-w-xs border-primary-foreground"
+          aria-describedby="connect-wallet-dialog"
+        >
           <DialogHeader>
             <DialogTitle>Select Wallet</DialogTitle>
           </DialogHeader>
@@ -60,15 +60,13 @@ export const ExoticDialog: ExoticDialogProps = ({ children, ...props }) => {
   }
 
   return (
-    <Drawer open={is_open} onOpenChange={handle_change}>
-      {!props.setOpen && <DrawerTrigger asChild>{trigger}</DrawerTrigger>}
-      <DrawerContent className="rounded-t-3xl border-primary-foreground">
-        <DrawerHeader className="text-left">
-          <DrawerTitle>Select Wallet</DrawerTitle>
-        </DrawerHeader>
-        {children}
-      </DrawerContent>
-    </Drawer>
+    <MemoizedDrawer
+      trigger={trigger}
+      is_open={is_open}
+      handle_change={handle_change}
+    >
+      {children}
+    </MemoizedDrawer>
   );
 };
 

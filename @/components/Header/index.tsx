@@ -12,17 +12,52 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { Link } from "@remix-run/react";
 import { Moon, Sun } from "lucide-react";
 import { Theme, useTheme } from "remix-themes";
 import { WalletWrapper } from "../Wrapper/wallet";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const Header = () => {
+  const is_desktop = useMediaQuery("(min-width: 768px)");
   const { copyToClipboard } = useCopyToClipboard();
   const [cur_theme, set_theme] = useTheme();
+
+  const Internal = ({
+    trigger,
+    content,
+  }: {
+    trigger: React.ReactNode;
+    content: React.ReactNode;
+  }) => {
+    if (is_desktop) {
+      return (
+        <HoverCard openDelay={200}>
+          <HoverCardTrigger asChild>{trigger}</HoverCardTrigger>
+          <HoverCardContent className="rounded-b-xl rounded-t-none backdrop-blur-lg md:w-[240px] w-[180px] -translate-x-6">
+            {content}
+          </HoverCardContent>
+        </HoverCard>
+      );
+    }
+
+    return (
+      <Popover>
+        <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+        <PopoverContent className="rounded-b-xl rounded-t-none backdrop-blur-lg md:w-[240px] w-[180px] -translate-x-6">
+          {content}
+        </PopoverContent>
+      </Popover>
+    );
+  };
 
   return (
     <div className="fixed top-0 z-30 w-full max-w-full flex-col">
@@ -52,8 +87,8 @@ const Header = () => {
                 Connector
               ) =>
                 connected ? (
-                  <HoverCard openDelay={200}>
-                    <HoverCardTrigger>
+                  <Internal
+                    trigger={
                       <Button
                         variant="outline"
                         className="hover:rounded-b-none flex md:w-[240px] w-[180px]  py-6 px-4 flex-row items-center justify-between backdrop-blur-lg"
@@ -99,128 +134,130 @@ const Header = () => {
                           </Avatar>
                         </div>
                       </Button>
-                    </HoverCardTrigger>
-                    <HoverCardContent className="rounded-b-xl rounded-t-none backdrop-blur-lg md:w-[240px] w-[180px] -translate-x-6">
-                      <Button
-                        className="cursor-pointer inline-flex items-center justify-start rounded-md p-2 w-full"
-                        size={"sm"}
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="24"
-                          height="24"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="lucide lucide-badge-dollar-sign mr-2 h-4 w-4 text-primary-600"
+                    }
+                    content={
+                      <>
+                        <Button
+                          className="cursor-pointer inline-flex items-center justify-start rounded-md p-2 w-full"
+                          size={"sm"}
                         >
-                          <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"></path>
-                          <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path>
-                          <path d="M12 18V6"></path>
-                        </svg>
-                        Buy with Kado
-                      </Button>
-                      <Separator className="my-2" />
-                      <div className="flex flex-row justify-end space-x-1">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() =>
-                                  set_theme(
-                                    cur_theme === Theme.LIGHT
-                                      ? Theme.DARK
-                                      : Theme.LIGHT
-                                  )
-                                }
-                              >
-                                <Sun className="h-4 w-4 stroke-zinc-500 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                                <Moon className="absolute  h-4 w-4 stroke-zinc-500 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Toggle theme</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() =>
-                                  address && copyToClipboard(address)
-                                }
-                              >
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="24"
-                                  height="24"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  className="lucide lucide-copy h-4 w-4 stroke-zinc-500 group-hover:stroke-white"
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="lucide lucide-badge-dollar-sign mr-2 h-4 w-4 text-primary-600"
+                          >
+                            <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"></path>
+                            <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path>
+                            <path d="M12 18V6"></path>
+                          </svg>
+                          Buy with Kado
+                        </Button>
+                        <Separator className="my-2" />
+                        <div className="flex flex-row justify-end space-x-1">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() =>
+                                    set_theme(
+                                      cur_theme === Theme.LIGHT
+                                        ? Theme.DARK
+                                        : Theme.LIGHT
+                                    )
+                                  }
                                 >
-                                  <rect
-                                    width="14"
-                                    height="14"
-                                    x="8"
-                                    y="8"
-                                    rx="2"
-                                    ry="2"
-                                  ></rect>
-                                  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
-                                </svg>
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Copy Address</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={disconnect}
-                              >
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="24"
-                                  height="24"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  className="lucide lucide-log-out size-4 stroke-zinc-500 group-hover:stroke-white"
+                                  <Sun className="h-4 w-4 stroke-zinc-500 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                                  <Moon className="absolute  h-4 w-4 stroke-zinc-500 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Toggle theme</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() =>
+                                    address && copyToClipboard(address)
+                                  }
                                 >
-                                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                                  <polyline points="16 17 21 12 16 7"></polyline>
-                                  <line x1="21" x2="9" y1="12" y2="12"></line>
-                                </svg>
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Disconnect</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </HoverCardContent>
-                  </HoverCard>
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="lucide lucide-copy h-4 w-4 stroke-zinc-500 group-hover:stroke-white"
+                                  >
+                                    <rect
+                                      width="14"
+                                      height="14"
+                                      x="8"
+                                      y="8"
+                                      rx="2"
+                                      ry="2"
+                                    ></rect>
+                                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+                                  </svg>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Copy Address</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={disconnect}
+                                >
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="24"
+                                    height="24"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="lucide lucide-log-out size-4 stroke-zinc-500 group-hover:stroke-white"
+                                  >
+                                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                    <polyline points="16 17 21 12 16 7"></polyline>
+                                    <line x1="21" x2="9" y1="12" y2="12"></line>
+                                  </svg>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Disconnect</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </>
+                    }
+                  />
                 ) : (
                   <Connector />
                 )

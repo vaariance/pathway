@@ -14,13 +14,36 @@ import {
   useTheme,
 } from "remix-themes";
 
-import { themeSessionResolver } from "./sessions.server";
 import { LoaderFunctionArgs } from "@remix-run/cloudflare";
 import clsx from "clsx";
+import { lazy, memo } from "react";
+import { themeSessionResolver } from "./sessions.server";
 
-import { lazy } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createConfig, http, WagmiProvider } from "wagmi";
+import { arbitrum, base, mainnet } from "wagmi/chains";
+import { coinbaseWallet, injected, walletConnect } from "wagmi/connectors";
 
-const LazyProviders = lazy(() => import("./providers"));
+const LazyCosmosProvider = lazy(async () => await import("./providers"));
+const CosmosProvider = memo(LazyCosmosProvider);
+
+export const project_id = "5874215139e2bf179decb72ddbd9197d";
+
+const config = createConfig({
+  chains: [mainnet, arbitrum, base],
+  connectors: [
+    coinbaseWallet(),
+    injected(),
+    walletConnect({ projectId: project_id }),
+  ],
+  transports: {
+    [mainnet.id]: http(),
+    [arbitrum.id]: http(),
+    [base.id]: http(),
+  },
+});
+
+const queryClient = new QueryClient();
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { getTheme } = await themeSessionResolver(request);
@@ -55,10 +78,13 @@ export default function App() {
   return (
     <ThemeProvider specifiedTheme={data.theme} themeAction="/action/set-theme">
       <Layout>
-        {/* todo: add suspense */}
-        <LazyProviders>
-          <Outlet />
-        </LazyProviders>
+        <WagmiProvider config={config}>
+          <QueryClientProvider client={queryClient}>
+            <CosmosProvider>
+              <Outlet />
+            </CosmosProvider>
+          </QueryClientProvider>
+        </WagmiProvider>
       </Layout>
     </ThemeProvider>
   );
