@@ -36,7 +36,7 @@ export const CosmosConnector: FC<
     return array.includes("mobile") ? array[0] + " mobile" : array[0];
   };
   return (
-    <ScrollArea className="max-h-[380px] w-full">
+    <ScrollArea className="max-h-[380px] sm:w-72">
       <div className="px-12 py-8 md:p-4 flex flex-col space-y-4">
         {wallet_repo?.wallets.map((connector: Connector) => (
           <Button

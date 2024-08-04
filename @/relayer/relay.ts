@@ -16,9 +16,15 @@ import {
   PROXY_CONTRACTS,
   VIEM_NETWORKS,
 } from "../constants/index.js";
-import { Abi, Address, encodeFunctionData, http, createClient } from "viem";
+import {
+  Abi,
+  Address,
+  encodeFunctionData,
+  http,
+  createClient,
+  Account,
+} from "viem";
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
-import { SigningStargateClient } from "@cosmjs/stargate";
 
 import { createLightAccountAlchemyClient } from "@alchemy/aa-alchemy";
 import { LocalAccountSigner } from "@alchemy/aa-core";
@@ -56,7 +62,7 @@ async function relay_eth_message(
     chain: ALCHEMY_CHAINS[path.to_chain]!,
     initCode: "0x",
     signer: account,
-    accountAddress: proxy?.address as Address,
+    accountAddress: proxy.address as Address,
     version: "v2.0.0",
     useSimulation: true,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -77,7 +83,10 @@ async function relay_eth_message(
     },
   });
 
-  const options = new PathwayOptions({ viem_client });
+  const options = new PathwayOptions({
+    viem_signer: account.inner as Account,
+    noble_signer: undefined,
+  });
   const pathway = new Pathway(options);
 
   const filter = await viem_client.createContractEventFilter({
@@ -129,12 +138,11 @@ async function relay_noble_message(
   const account = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic, {
     prefix: "noble",
   });
-  const noble_client = await SigningStargateClient.connectWithSigner(
-    process.env.NOBLE_RPC_URL!,
-    account
-  );
 
-  const options = new PathwayOptions({ noble_client });
+  const options = new PathwayOptions({
+    viem_signer: undefined,
+    noble_signer: account,
+  });
   const pathway = new Pathway(options);
 
   try {

@@ -4,6 +4,69 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 import { Button } from "@/components/ui/button";
 import { Wallet } from "lucide-react";
+import { useEffect, useState } from "react";
+import * as rqp from "react-qrcode-pretty";
+
+export function EVMConnector() {
+  const { connectors, connect } = useConnect();
+  const [wc_uri, set_wc_uri] = useState<string | null>(null);
+
+  useEffect(() => {
+    const wc = connectors.find(
+      (connector: Connector) => connector.name === "WalletConnect"
+    );
+    wc?.emitter.on("message", (data: { type: string; data?: unknown }) => {
+      set_wc_uri(data.data as string);
+    });
+  }, [connectors, connect]);
+
+  return (
+    <>
+      {wc_uri ? (
+        <div className="bg-background p-4 sm:w-fit flex justify-center mb-4">
+          <rqp.QrCode
+            value={wc_uri}
+            variant={{
+              eyes: "gravity",
+              body: "dots",
+            }}
+            color={{
+              eyes: "rgba(34, 197, 94, 1)",
+              body: "rgba(34, 197, 94, 0.5)",
+            }}
+            padding={0}
+            margin={0}
+            bgColor="#00000000"
+            size={320}
+            bgRounded
+            divider
+          />
+        </div>
+      ) : (
+        <ScrollArea className="max-h-[380px] sm:w-72">
+          <div className="px-12 py-8 md:p-4 flex flex-col space-y-4">
+            {connectors.map((connector: Connector) => (
+              <Button
+                variant={"ghost"}
+                key={connector.uid}
+                onClick={() => connect({ connector })}
+                className="items-center justify-between"
+              >
+                {connector.name}
+                <Avatar className="h-6 w-6 justify-center rounded-lg">
+                  <AvatarImage src={connector.icon} alt={connector.name} />
+                  <AvatarFallback>
+                    {WalletIcons[connector.name.slice(0, 2).toLowerCase()]}
+                  </AvatarFallback>
+                </Avatar>
+              </Button>
+            ))}
+          </div>
+        </ScrollArea>
+      )}
+    </>
+  );
+}
 
 export const WalletIcons: Record<string, React.ReactNode> = {
   in: <Wallet className="h-4 w-4" />,
@@ -46,30 +109,3 @@ export const WalletIcons: Record<string, React.ReactNode> = {
     </svg>
   ),
 };
-
-export function EVMConnector() {
-  const { connectors, connect } = useConnect();
-
-  return (
-    <ScrollArea className="max-h-[380px] w-full">
-      <div className="px-12 py-8 md:p-4 flex flex-col space-y-4">
-        {connectors.map((connector: Connector) => (
-          <Button
-            variant={"ghost"}
-            key={connector.uid}
-            onClick={() => connect({ connector })}
-            className="items-center justify-between"
-          >
-            {connector.name}
-            <Avatar className="h-6 w-6 justify-center rounded-lg">
-              <AvatarImage src={connector.icon} alt={connector.name} />
-              <AvatarFallback>
-                {WalletIcons[connector.name.slice(0, 2).toLowerCase()]}
-              </AvatarFallback>
-            </Avatar>
-          </Button>
-        ))}
-      </div>
-    </ScrollArea>
-  );
-}

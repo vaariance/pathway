@@ -52,10 +52,23 @@ import {
 import debounce from "lodash.debounce";
 import { chain_data, PathContructor } from "@/constants/.";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatUnits } from "viem";
+import { Quote } from "@/sdk";
 
 type BodyProps = React.ComponentProps<typeof Card>;
 
 export function Body({ className, ...props }: BodyProps) {
+  const render_quote = (quote: Quote): string => {
+    const execution_cost = quote.estimated_fee["execution_cost"];
+    const routing_fee = quote.estimated_fee["routing_fee"];
+
+    const exec_fee = formatUnits(
+      execution_cost.amount + routing_fee.amount,
+      execution_cost.decimals
+    );
+
+    return "$" + Number(exec_fee).toFixed(4);
+  };
   return (
     <AnimatePresence>
       <motion.div
@@ -74,7 +87,8 @@ export function Body({ className, ...props }: BodyProps) {
             on_accept,
             accepted,
             change_route,
-            change_chain
+            change_chain,
+            quote
           ) => (
             <Card
               className={cn(
@@ -162,26 +176,54 @@ export function Body({ className, ...props }: BodyProps) {
                     {...{ path, set_error, set_address, change_chain }}
                   />
                 </div>
-                <ul className="grid gap-3 text-sm">
+                <ul className="grid gap-3 text-sm text-muted-foreground">
                   <li className="flex items-center justify-between">
-                    <span className="text-muted-foreground">
-                      You will receive:
-                    </span>
-                    <span>$99.00</span>
+                    <span>You will receive:</span>
+                    {quote?.ok ? (
+                      <span className="italic">
+                        {"$"}
+                        {Number(
+                          formatUnits(quote.unwrap().estimated_output_amount, 6)
+                        ).toFixed(2)}
+                      </span>
+                    ) : (
+                      <span>
+                        <Skeleton className="w-[100px] h-[20px] rounded-full" />
+                      </span>
+                    )}
                   </li>
                   <li className="flex items-center justify-between">
-                    <span className="text-muted-foreground">
-                      Estimated fee:
-                    </span>
-                    <span>
-                      <Skeleton className="w-[100px] h-[20px] rounded-full" />
-                    </span>
+                    <span>Estimated fee:</span>
+                    {quote?.ok ? (
+                      <span className="italic">
+                        {render_quote(quote.unwrap())}
+                      </span>
+                    ) : (
+                      <span>
+                        <Skeleton className="w-[100px] h-[20px] rounded-full" />
+                      </span>
+                    )}
                   </li>
                   <li className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Ariving in:</span>
-                    <span>
-                      <Skeleton className="w-[100px] h-[20px] rounded-full" />
-                    </span>
+                    <span>Ariving in:</span>
+                    {quote?.ok ? (
+                      <span className="italic">
+                        {quote.unwrap().estimated_time_in_milliseconds / 1000 <
+                        60
+                          ? Math.round(
+                              quote.unwrap().estimated_time_in_milliseconds /
+                                1000
+                            ) + " sec"
+                          : Math.floor(
+                              quote.unwrap().estimated_time_in_milliseconds /
+                                60000
+                            ) + " mins"}
+                      </span>
+                    ) : (
+                      <span>
+                        <Skeleton className="w-[100px] h-[20px] rounded-full" />
+                      </span>
+                    )}
                   </li>
                 </ul>
                 <TermsOfService accepted={accepted} on_accept={on_accept} />
@@ -189,7 +231,12 @@ export function Body({ className, ...props }: BodyProps) {
               <CardFooter>
                 <div className="flex-1 space-y-4 justify-center">
                   <Button
-                    disabled={!accepted || !is_connected || !path.receiver}
+                    disabled={
+                      !accepted ||
+                      !is_connected ||
+                      !path.receiver ||
+                      Number(path.amount) <= 0
+                    }
                     className="w-full"
                     onClick={() => {}}
                   >
@@ -198,6 +245,8 @@ export function Body({ className, ...props }: BodyProps) {
                       ? "Wallet Not Connected"
                       : !path.receiver
                       ? "Recipient Empty"
+                      : Number(path.amount) <= 0
+                      ? "Amount too Small"
                       : "Walk"}
                   </Button>
                   <Separator />
@@ -450,7 +499,7 @@ function AddressSelection({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const debounced_validation = useCallback(
     debounce((value) => {
-      set_error({ address: validate_address(value) });
+      set_error({ address: validate_address(value, path.inverse) });
     }, 300),
     [set_error]
   );
@@ -469,7 +518,7 @@ function AddressSelection({
   };
 
   const handle_blur = () => {
-    set_error({ address: validate_address(path.receiver) });
+    set_error({ address: validate_address(path.receiver, path.inverse) });
   };
 
   return (

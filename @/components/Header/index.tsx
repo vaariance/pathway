@@ -52,7 +52,7 @@ const Header = () => {
     return (
       <Popover>
         <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-        <PopoverContent className="rounded-b-xl rounded-t-none backdrop-blur-lg md:w-[240px] w-[180px] -translate-x-6">
+        <PopoverContent className="rounded-b-xl rounded-t-none backdrop-blur-lg md:w-[240px] w-[180px]">
           {content}
         </PopoverContent>
       </Popover>

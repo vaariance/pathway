@@ -6,13 +6,8 @@ import { AssetsList } from "@/constants/.";
 
 export const useExoticBalance = (mode: string) => {
   const [cosmos_balance, set_cosmos_balance] = useState<bigint>(BigInt(0));
-  const {
-    address,
-    getRpcEndpoint,
-    isWalletConnected,
-    chain,
-    getStargateClient,
-  } = useChain("noble");
+  const { address, isWalletConnected, chain, getStargateClient } =
+    useChain("noble");
 
   const chain_id = useChainId();
   const { address: eth_address, isConnected } = useAccount();
@@ -52,7 +47,7 @@ export const useExoticBalance = (mode: string) => {
 
     mode === "noble" && fetch_cosmos_balance();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, getRpcEndpoint]);
+  }, [address]);
 
   return {
     balance:

@@ -1,19 +1,24 @@
 import { coin } from "@cosmjs/amino";
 import { fromBech32, toBech32 } from "@cosmjs/encoding";
+import { GeneratedType, OfflineSigner, Registry } from "@cosmjs/proto-signing";
 import { SigningStargateClient, StargateClient } from "@cosmjs/stargate";
 import axios from "axios";
+import { Buffer } from "buffer";
 import {
   Abi,
+  Account,
   Address,
   createPublicClient,
+  createWalletClient,
+  custom,
+  encodeAbiParameters,
   http,
   keccak256,
+  maxUint256,
+  numberToHex,
   parseEventLogs,
-  PublicActions,
+  publicActions,
   toHex,
-  Client,
-  WriteContractParameters,
-  WalletActions,
 } from "viem";
 import { normalize } from "viem/ens";
 import {
@@ -33,17 +38,20 @@ import {
   USDC_CONTRACTS,
   VIEM_NETWORKS,
 } from "../constants/index.js";
+import { MsgDepositForBurnWithCaller, MsgReceiveMessage } from "./generated.js";
 
 export type SerializableResult<T, E> =
   | {
       ok: false;
       value?: undefined;
       error: E;
+      info?: unknown;
     }
   | {
       ok: true;
       value: T;
       error?: undefined;
+      info?: undefined;
     };
 
 export type Result<T, E = string> = SerializableResult<T, E> & {
@@ -57,8 +65,9 @@ export type Result<T, E = string> = SerializableResult<T, E> & {
 export const Result = <T, E>(res: SerializableResult<T, E>): Result<T, E> =>
   res.ok ? Ok(res.value) : Err(res.error);
 
-export const Err = <E>(error: E): Result<never, E> => ({
+export const Err = <E>(error: E, info?: unknown): Result<never, E> => ({
   ok: false,
+  info,
   error,
   unwrap: () => {
     throw error;
@@ -83,6 +92,15 @@ export const Ok = <T>(value: T): Result<T, never> => ({
   map: <U>(f: (v: T) => U): Result<U, never> => Ok(f(value)),
 });
 
+export const cctp_types: ReadonlyArray<[string, GeneratedType]> = [
+  ["/circle.cctp.v1.MsgDepositForBurnWithCaller", MsgDepositForBurnWithCaller],
+  ["/circle.cctp.v1.MsgReceiveMessage", MsgReceiveMessage],
+];
+
+export const create_default_registry = (): Registry => {
+  return new Registry(cctp_types);
+};
+
 export type Receiver = `0x${string}` | `noble1${string}` | `${string}.eth`;
 
 export type Path = {
@@ -96,7 +114,7 @@ export type Path = {
 export type ExecutionResponse = {
   hash?: string;
   gas: {
-    amount: number | bigint;
+    amount: bigint;
     denom: "eth" | "usd";
     decimals: number;
     free: boolean;
@@ -111,42 +129,43 @@ export type ReceiveMessage = {
   status: "pending" | "attested" | "received" | "failed";
   destination_block_height_at_deposit: bigint;
   nonce: bigint;
-  original_path?: Path;
+  original_path: Path;
 };
 
-export type ViemWalletClient<T> = T extends WalletActions
-  ? Client & T & PublicActions
-  : Client & T;
-
-export type CosmosWalletClient<R> = R extends SigningStargateClient
-  ? SigningStargateClient
-  : StargateClient;
-
-export type PathwayClient<T, R> = ViemWalletClient<T> | CosmosWalletClient<R>;
-
 export type Quote = {
-  estimated_fee: Record<string, Record<string, unknown>>;
+  estimated_fee: Record<
+    string,
+    {
+      amount: bigint;
+      denom: string;
+      decimals: number;
+      free: boolean;
+    }
+  >;
   estimated_time_in_milliseconds: number;
   estimated_output_amount: bigint;
 };
 
 export class PathwayOptions<T, R> {
-  public viem_client?: T;
-  public noble_client?: R;
+  public viem_signer?: T;
+  public noble_signer?: R;
 
   constructor({
-    viem_client,
-    noble_client,
+    viem_signer,
+    noble_signer,
   }: {
-    viem_client?: T;
-    noble_client?: R;
+    viem_signer?: T;
+    noble_signer?: R;
   }) {
-    this.viem_client = viem_client;
-    this.noble_client = noble_client;
+    this.viem_signer = viem_signer;
+    this.noble_signer = noble_signer;
   }
 }
 
-export class Pathway<T, R> {
+export class Pathway<
+  T extends Account | Address | undefined,
+  R extends OfflineSigner | undefined
+> {
   options?: PathwayOptions<T, R>;
   constructor(options?: PathwayOptions<T, R>) {
     this.options = options;
@@ -184,41 +203,49 @@ export class Pathway<T, R> {
   /**
    * Retrieves the Ethereum client.
    *
-   * @return {ViemWalletClient} The Ethereum client.
+   * @return {WalletClient | PublicClient} The Ethereum client.
    * @throws {Error} If the Viem client is not available.
    */
-  private get_ethereum_client(chain?: Chains) {
-    if (this.options?.viem_client) {
-      return this.options.viem_client as T & ViemWalletClient<PublicActions>;
+  private get_ethereum_client(chain: Chains, strict = false) {
+    if (this.options?.viem_signer && !strict) {
+      return this.get_ethereum_wallet_client(chain);
     }
-    if (chain) {
-      return createPublicClient({
-        chain: VIEM_NETWORKS[chain],
-        transport: http(),
-      });
-    }
-    throw new Error("Viem client is not provided and chain is not specified");
+    return createPublicClient({
+      chain: VIEM_NETWORKS[chain],
+      transport: http(),
+    });
   }
 
   /**
    * Retrieves the Ethereum wallet client.
    *
-   * @return {ViemWalletClient<WalletActions>} The Ethereum wallet client.
+   * @return {WalletClient} The Ethereum wallet client.
    * @throws {Error} If the Viem wallet client is not provided or does not have wallet capabilities.
    */
-  private get_ethereum_wallet_client(): ViemWalletClient<WalletActions> {
-    if (!this.options?.viem_client) {
-      throw new Error("Viem wallet client is not provided");
+  private get_ethereum_wallet_client(chain: Chains) {
+    if (!this.options?.viem_signer) {
+      throw new Error("Viem account is not provided");
+    }
+    let client;
+    switch (typeof this.options.viem_signer === "string") {
+      case true:
+        client = createWalletClient({
+          account: this.options.viem_signer as Address,
+          chain: VIEM_NETWORKS[chain],
+          transport: custom(window.ethereum!),
+        }).extend(publicActions);
+        break;
+
+      default:
+        client = createWalletClient({
+          account: this.options.viem_signer as Account,
+          chain: VIEM_NETWORKS[chain],
+          transport: http(),
+        });
+        break;
     }
 
-    if (
-      typeof this.options.viem_client === "object" &&
-      "writeContract" in this.options.viem_client
-    ) {
-      return this.options.viem_client as T & ViemWalletClient<WalletActions>;
-    }
-
-    throw new Error("Viem wallet client does not have wallet capabilities");
+    return client.extend(publicActions);
   }
 
   /**
@@ -228,9 +255,8 @@ export class Pathway<T, R> {
    * @throws {Error} If the Noble client is not available or if the Noble client expects an offline signer.
    */
   private async get_noble_client() {
-    if (this.options?.noble_client) {
-      return this.options.noble_client as R &
-        CosmosWalletClient<StargateClient>;
+    if (this.options?.noble_signer) {
+      return this.get_noble_wallet_client();
     }
     return StargateClient.connect(NOBLE_RPC);
   }
@@ -242,15 +268,16 @@ export class Pathway<T, R> {
    * @throws {Error} If the Noble client is not provided or if it is not an instance of SigningStargateClient.
    */
   private async get_noble_wallet_client() {
-    if (!this.options?.noble_client) {
-      throw new Error("Noble client is not provided");
+    if (!this.options?.viem_signer) {
+      throw new Error("Noble offline signer is not provided");
     }
-    if (!(this.options.noble_client instanceof SigningStargateClient)) {
-      throw new Error(
-        "Noble client is provided but is not a SigningStargateClient"
-      );
-    }
-    return this.options.noble_client;
+    return SigningStargateClient.connectWithSigner(
+      NOBLE_RPC,
+      this.options.noble_signer!,
+      {
+        registry: create_default_registry(),
+      }
+    );
   }
 
   private async get_allowance(path: Path): Promise<boolean> {
@@ -277,19 +304,19 @@ export class Pathway<T, R> {
    * @return {Promise<void>} A promise that resolves when the approval is complete.
    */
   async approve(path: Path): Promise<void> {
-    const { from_chain, amount } = path;
+    const { from_chain } = path;
     const allowance = await this.get_allowance(path);
 
-    const client = this.get_ethereum_wallet_client();
+    const client = this.get_ethereum_wallet_client(Chains[path.from_chain]);
 
     if (!allowance && from_chain !== Chains.noble) {
       const { request } = await client.simulateContract({
         address: USDC_CONTRACTS[from_chain],
         abi: IERC20,
         functionName: "approve",
-        args: [TOKEN_MESSENGERS[from_chain], amount],
+        args: [TOKEN_MESSENGERS[from_chain] as Address, maxUint256],
       });
-      await client.writeContract(request as WriteContractParameters);
+      await client.writeContract(request);
     }
   }
 
@@ -310,8 +337,13 @@ export class Pathway<T, R> {
    * @return {Promise<number>} A promise that resolves to the current Ethereum block height.
    */
   async get_eth_block_height(domain: number): Promise<bigint> {
-    const client = this.get_ethereum_client(REVERSE_DOMAINS[domain]);
+    const client = this.get_ethereum_client(REVERSE_DOMAINS[domain], true);
     return await client.getBlockNumber();
+  }
+
+  async get_gas_price(chain: Chains): Promise<bigint> {
+    const client = this.get_ethereum_client(chain, true);
+    return await client.getGasPrice();
   }
 
   /**
@@ -384,7 +416,10 @@ export class Pathway<T, R> {
    */
   async reverse_ens_name(name: string): Promise<string | null> {
     if (name.endsWith(".eth")) {
-      return await this.get_ethereum_client(Chains.ethereum).getEnsAddress({
+      return await createPublicClient({
+        chain: VIEM_NETWORKS[Chains.ethereum],
+        transport: http(),
+      }).getEnsAddress({
         name: normalize(name),
       });
     }
@@ -400,10 +435,10 @@ export class Pathway<T, R> {
    */
   private async eth_deposit_for_burn_with_caller(
     path: Path,
-    { simulate_only = false }
+    { estimate_only = false }
   ): Promise<ExecutionResponse> {
     const { from_chain, to_chain, receiver_address, amount } = path;
-    const client = this.get_ethereum_wallet_client();
+    const client = this.get_ethereum_wallet_client(Chains[path.from_chain]);
 
     const receipient = this.get_bytes_from_bech_32(
       receiver_address as `noble1${string}`
@@ -416,7 +451,7 @@ export class Pathway<T, R> {
     const msg = {
       address: TOKEN_MESSENGERS[from_chain] as Address,
       abi: ICCTP,
-      functionName: "depositForBurnWithCaller",
+      functionName: "depositForBurnWithCaller" as never,
       args: [
         amount,
         DOMAINS[to_chain],
@@ -425,34 +460,71 @@ export class Pathway<T, R> {
         toHex(destination_caller),
       ],
     };
-    //@ts-expect-error it is not infering type from non obg literal
-    const gas_used = await client.estimateContractGas({ ...msg });
-    //@ts-expect-error it is not infering type from non obg literal
-    const { request } = await client.simulateContract({
+
+    const gas_used = await client.estimateContractGas({
       ...msg,
-      gas: gas_used,
+      account: path.sender_address as Address,
+      stateOverride: [
+        {
+          address: USDC_CONTRACTS[from_chain] as Address,
+          stateDiff: [
+            {
+              slot: keccak256(
+                encodeAbiParameters(
+                  [
+                    { name: "x", type: "address" },
+                    { name: "y", type: "bytes32" },
+                  ],
+                  [
+                    TOKEN_MESSENGERS[from_chain] as Address,
+                    keccak256(
+                      encodeAbiParameters(
+                        [
+                          { name: "x", type: "address" },
+                          { name: "y", type: "uint256" },
+                        ],
+                        [path.sender_address as Address, 10n]
+                      )
+                    ),
+                  ]
+                )
+              ),
+              value: numberToHex(maxUint256),
+            },
+          ],
+        },
+      ],
     });
-    if (!simulate_only) {
-      const hash = await client.writeContract(
-        request as WriteContractParameters
-      );
+    const gas_price = await this.get_gas_price(from_chain);
+    const gas_in_usdc = await this.get_usd_quote_for_wei(
+      gas_used * gas_price,
+      from_chain
+    );
+
+    if (!estimate_only) {
+      const { result, request } = await client.simulateContract({
+        ...msg,
+        account: path.sender_address as Address,
+      });
+      result;
+      const hash = await client.writeContract(request);
       const confirmations = from_chain === "ethereum" ? 3 : 1;
       await client.waitForTransactionReceipt({ hash, confirmations });
       return {
         hash,
         gas: {
-          amount: gas_used,
-          denom: "eth",
-          decimals: 18,
+          amount: gas_in_usdc,
+          denom: "usd",
+          decimals: 6,
           free: false,
         },
       };
     }
     return {
       gas: {
-        amount: gas_used,
-        denom: "eth",
-        decimals: 18,
+        amount: gas_in_usdc,
+        denom: "usd",
+        decimals: 6,
         free: false,
       },
     };
@@ -467,7 +539,7 @@ export class Pathway<T, R> {
    */
   private async noble_deposit_for_burn_with_caller(
     path: Path,
-    { simulate_only = false }
+    { estimate_only = false }
   ): Promise<ExecutionResponse> {
     const { from_chain, to_chain, sender_address, amount } = path;
     const client = await this.get_noble_wallet_client();
@@ -496,7 +568,7 @@ export class Pathway<T, R> {
       amount: [coin(0, "uusd")],
       gas: gas_used.toString(),
     };
-    if (!simulate_only) {
+    if (!estimate_only) {
       const result = await client.signAndBroadcast(
         sender_address,
         [msg],
@@ -530,7 +602,9 @@ export class Pathway<T, R> {
    * @param {string} hash - The hash of the transaction.
    * @return {Promise<ReceiveMessage>} A promise that resolves to the generated receive message.
    */
-  async generate_eth_receive_message(hash: string): Promise<ReceiveMessage> {
+  async generate_eth_receive_message(
+    hash: string
+  ): Promise<Omit<ReceiveMessage, "original_path">> {
     const client = await this.get_noble_client();
     const receipt = await client.getTx(hash);
     if (!receipt || receipt?.code !== 0) {
@@ -573,7 +647,7 @@ export class Pathway<T, R> {
   async generate_noble_receive_message(
     hash: string,
     from_chain: Chains
-  ): Promise<ReceiveMessage> {
+  ): Promise<Omit<ReceiveMessage, "original_path">> {
     const client = await this.get_ethereum_client(from_chain);
     const receipt = await client.getTransactionReceipt({
       hash: hash as `0x${string}`,
@@ -625,10 +699,10 @@ export class Pathway<T, R> {
     const attestation = this.get_bytes_from_hex(circle_attestation!, false);
 
     const client = await this.get_noble_wallet_client();
-    const caller = outside_caller ?? DESTINATION_CALLERS[path!.to_chain];
+    const caller = outside_caller ?? DESTINATION_CALLERS[path.to_chain];
 
     const msg = {
-      typeUrl: MESSAGE_TRANSMITTERS[path!.to_chain],
+      typeUrl: MESSAGE_TRANSMITTERS[path.to_chain],
       value: {
         from: caller,
         message,
@@ -671,7 +745,7 @@ export class Pathway<T, R> {
    */
   async receive_message_eth(
     receive_message: ReceiveMessage,
-    { simulate_only = false }
+    { estimate_only = false }
   ): Promise<ExecutionResponse> {
     const {
       message_bytes,
@@ -679,43 +753,44 @@ export class Pathway<T, R> {
       original_path: path,
     } = receive_message;
 
-    const client = this.get_ethereum_wallet_client();
-    const proxy = PROXY_CONTRACTS[path!.to_chain];
+    const client = this.get_ethereum_wallet_client(Chains[path.to_chain]);
+    const proxy = PROXY_CONTRACTS[path.to_chain];
 
     const msg = {
-      address: proxy?.address as Address,
+      address: proxy.address as Address,
       abi: ICCTP,
-      functionName: "receiveMessage",
+      functionName: "receiveMessage" as never,
       args: [message_bytes as Address, circle_attestation as Address],
     };
 
-    //@ts-expect-error it is not infering type from non obg literal
-    const gas_used = await client.estimateContractGas({ ...msg });
+    const gas_used = await client.estimateContractGas(msg);
+    const gas_price = await this.get_gas_price(path.to_chain);
 
-    //@ts-expect-error it is not infering type from non obg literal
-    const { request } = await client.simulateContract({
-      ...msg,
-      gas: gas_used,
-    });
-    if (!simulate_only) {
-      const hash = await client.writeContract(
-        request as WriteContractParameters
-      );
+    const gas_in_usdc = await this.get_usd_quote_for_wei(
+      gas_used * gas_price,
+      path.to_chain
+    );
+
+    if (!estimate_only) {
+      const { request } = await client.simulateContract({
+        ...msg,
+      });
+      const hash = await client.writeContract(request);
       return {
         hash,
         gas: {
-          amount: gas_used,
-          denom: "eth",
-          decimals: 18,
+          amount: gas_in_usdc,
+          denom: "usd",
+          decimals: 6,
           free: false,
         },
       };
     }
     return {
       gas: {
-        amount: gas_used,
-        denom: "eth",
-        decimals: 18,
+        amount: gas_in_usdc,
+        denom: "usd",
+        decimals: 6,
         free: false,
       },
     };
@@ -730,22 +805,24 @@ export class Pathway<T, R> {
       original_path: path,
     } = receive_message;
 
-    const client = this.get_ethereum_client(path?.to_chain);
-    const proxy = PROXY_CONTRACTS[path!.to_chain];
+    const client = this.get_ethereum_client(path.to_chain);
+    const proxy = PROXY_CONTRACTS[path.to_chain];
 
-    const slope = this.get_fee_for_usdc_amount(path!.amount);
+    const slope = this.get_fee_for_usdc_amount(path.amount);
 
     const gas_used = await client.estimateContractGas({
-      address: proxy?.address as Address,
-      abi: proxy?.abi as Abi,
+      address: proxy.address as Address,
+      abi: proxy.abi as Abi,
       functionName: "receiveMessage",
-      args: [path!.receiver_address, message_bytes, circle_attestation, slope],
-      account: proxy?.address as Address,
+      args: [path.receiver_address, message_bytes, circle_attestation, slope],
+      account: proxy.address as Address,
     });
 
+    const gas_price = await this.get_gas_price(path.to_chain);
+
     const gas_in_usdc = await this.get_usd_quote_for_wei(
-      gas_used,
-      path?.to_chain
+      gas_used * gas_price,
+      path.to_chain
     );
     const total_fee = slope + gas_in_usdc;
 
@@ -815,17 +892,17 @@ export class Pathway<T, R> {
     path.receiver_address = cleaned_receiver as Receiver;
 
     let execution_response: ExecutionResponse;
-    let message: ReceiveMessage;
+    let message: Omit<ReceiveMessage, "original_path">;
     if (path.from_chain === Chains.noble) {
       execution_response = await this.noble_deposit_for_burn_with_caller(path, {
-        simulate_only: false,
+        estimate_only: false,
       });
       message = await this.generate_eth_receive_message(
         execution_response.hash!
       );
     } else {
       execution_response = await this.eth_deposit_for_burn_with_caller(path, {
-        simulate_only: false,
+        estimate_only: false,
       });
       message = await this.generate_noble_receive_message(
         execution_response.hash!,
@@ -864,53 +941,57 @@ export class Pathway<T, R> {
     }
     path.receiver_address = cleaned_receiver as Receiver;
 
-    let execution_cost: ExecutionResponse;
-    if (from_chain === Chains.noble) {
-      execution_cost = await this.noble_deposit_for_burn_with_caller(path, {
-        simulate_only: true,
-      });
-    } else {
-      execution_cost = await this.eth_deposit_for_burn_with_caller(path, {
-        simulate_only: true,
-      });
-    }
+    try {
+      let execution_cost: ExecutionResponse;
+      if (from_chain === Chains.noble) {
+        execution_cost = await this.noble_deposit_for_burn_with_caller(path, {
+          estimate_only: true,
+        });
+      } else {
+        execution_cost = await this.eth_deposit_for_burn_with_caller(path, {
+          estimate_only: true,
+        });
+      }
 
-    let receive_message: ReceiveMessage;
-    if (to_chain !== Chains.noble) {
-      receive_message = await this.generate_eth_receive_message(
-        "EF3EF3FF88F9B67D166856713D26BE9A55B1957FE0E0EE8FBC2555BBDCBF3406"
-      );
-    }
+      let receive_message: Omit<ReceiveMessage, "original_path">;
+      if (to_chain !== Chains.noble) {
+        receive_message = await this.generate_eth_receive_message(
+          "EF3EF3FF88F9B67D166856713D26BE9A55B1957FE0E0EE8FBC2555BBDCBF3406"
+        );
+      }
 
-    let routing_fee;
-    if (to_chain === Chains.noble) {
-      routing_fee = {
-        gas: {
-          amount: BigInt(0),
-          denom: "usd",
-          decimals: 6,
-          free: true,
+      let routing_fee;
+      if (to_chain === Chains.noble) {
+        routing_fee = {
+          gas: {
+            amount: BigInt(0),
+            denom: "usd",
+            decimals: 6,
+            free: true,
+          },
+        };
+      } else {
+        const message: ReceiveMessage = {
+          ...receive_message!,
+          circle_attestation:
+            "0x09d3d8bdd081f0134d320d0f47dafe6f0b1e9361e1932b3d93e6243fe27407d5002fe4e105188dc65045ef4fc4ae00615880624cb4c30412828053a314c9f0ce1b7abe99afe5e612b737bce57113d4ef58f5fb8a38a3f4c9628843cbc45831090e0ba066888d0845556b53d3ea31a7379dfb5b89085a5e1c867255be1f1b7b12291c",
+          block_confirmation_in_ms: time,
+          original_path: path,
+        };
+        routing_fee = await this.estimate_receive_message_eth(message);
+      }
+
+      return Ok({
+        estimated_time_in_milliseconds: time,
+        estimated_output_amount: amount - BigInt(routing_fee.gas.amount),
+        estimated_fee: {
+          execution_cost: execution_cost.gas,
+          routing_fee: routing_fee.gas,
         },
-      };
-    } else {
-      const message: ReceiveMessage = {
-        ...receive_message!,
-        circle_attestation:
-          "0x09d3d8bdd081f0134d320d0f47dafe6f0b1e9361e1932b3d93e6243fe27407d5002fe4e105188dc65045ef4fc4ae00615880624cb4c30412828053a314c9f0ce1b7abe99afe5e612b737bce57113d4ef58f5fb8a38a3f4c9628843cbc45831090e0ba066888d0845556b53d3ea31a7379dfb5b89085a5e1c867255be1f1b7b12291c",
-        block_confirmation_in_ms: time,
-        original_path: path,
-      };
-      routing_fee = await this.estimate_receive_message_eth(message);
+      });
+    } catch (error: unknown) {
+      return Err("Unable to get quote", error);
     }
-
-    return Ok({
-      estimated_time_in_milliseconds: time,
-      estimated_output_amount: amount - BigInt(routing_fee.gas.amount),
-      estimated_fee: {
-        execution_cost: execution_cost.gas,
-        routing_fee: routing_fee.gas,
-      },
-    });
   }
 
   /**
@@ -951,7 +1032,7 @@ export class Pathway<T, R> {
    * @param {bigint} wei - The amount of Wei for which to retrieve the USD quote.
    * @return {Promise<bigint>} A promise that resolves to the USD quote for the given amount of Wei.
    */
-  async get_usd_quote_for_wei(wei: bigint, chain?: Chains): Promise<bigint> {
+  async get_usd_quote_for_wei(wei: bigint, chain: Chains): Promise<bigint> {
     const client = this.get_ethereum_client(chain);
 
     const round_data = await client.readContract({

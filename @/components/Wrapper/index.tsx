@@ -11,6 +11,8 @@ import { useSwitchChain } from "wagmi";
 
 import { useExoticBalance } from "@/hooks/use-exotic-balance";
 import { ChainMetadata, chain_data, Mode, PathContructor } from "@/constants/.";
+import { useDebouncedQuote } from "@/hooks/use-debounced-quote";
+import { Result, Quote } from "@/sdk";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type WrapperProps<T> = {
@@ -23,7 +25,9 @@ type WrapperProps<T> = {
     on_accept: () => void,
     accepted: boolean,
     change_route: (next: string) => void,
-    change_chain: (new_chain: string) => void
+    change_chain: (new_chain: string) => void,
+    quote: Result<Quote, string> | undefined,
+    refresh_quote: () => void
   ) => ReactElement;
 };
 
@@ -119,6 +123,8 @@ export const Wrapper = <T extends Element>({ children }: WrapperProps<T>) => {
     };
   }, [mode, amount, balance, address, error, chain]);
 
+  const { quote, refresh_quote } = useDebouncedQuote(path);
+
   return children(
     is_connected,
     _set_error,
@@ -128,6 +134,8 @@ export const Wrapper = <T extends Element>({ children }: WrapperProps<T>) => {
     on_accept,
     accepted,
     change_route,
-    change_chain
+    change_chain,
+    quote,
+    refresh_quote
   );
 };

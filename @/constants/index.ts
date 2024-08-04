@@ -23,7 +23,7 @@ export const PROXY_CONTRACTS = {
   arbitrum: arbitrum_contract,
   base: base_contract,
   ethereum: ethereum_contract,
-  noble: null,
+  noble: { address: "", abi: {}, bytecode: "" },
 };
 
 export const IMPLEMENTATION_CONTRACT =

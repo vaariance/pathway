@@ -34,7 +34,20 @@ const config = createConfig({
   connectors: [
     coinbaseWallet(),
     injected(),
-    walletConnect({ projectId: project_id }),
+    walletConnect({
+      projectId: project_id,
+      disableProviderPing: true,
+      metadata: {
+        name: "Pathway",
+        description: "Pathway - USDC Bridge",
+        url: "https://app.thepathway.to",
+        icons: [
+          "https://app.thepathway.to/favicon.png",
+          "https://app.thepathway.to/logo.svg",
+        ],
+      },
+      showQrModal: false,
+    }),
   ],
   transports: {
     [mainnet.id]: http(),

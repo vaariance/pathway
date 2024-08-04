@@ -59,11 +59,6 @@ export default defineConfig({
       ],
     },
   },
-  resolve: {
-    alias: {
-      buffer: "buffer",
-    },
-  },
 
   build: {
     rollupOptions: {

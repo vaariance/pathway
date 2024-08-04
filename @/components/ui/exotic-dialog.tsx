@@ -47,7 +47,7 @@ export const ExoticDialog: ExoticDialogProps = ({ children, ...props }) => {
         {!props.setOpen && <DialogTrigger asChild>{trigger}</DialogTrigger>}
 
         <DialogContent
-          className="sm:max-w-xs border-primary-foreground"
+          className="border-primary-foreground"
           aria-describedby="connect-wallet-dialog"
         >
           <DialogHeader>
