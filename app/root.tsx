@@ -14,7 +14,7 @@ import {
   useTheme,
 } from "remix-themes";
 
-import { LoaderFunctionArgs, AppLoadContext } from "@remix-run/cloudflare";
+import { LoaderFunctionArgs } from "@remix-run/cloudflare";
 import clsx from "clsx";
 import { lazy, memo } from "react";
 import { themeSessionResolver } from "./sessions.server";
@@ -64,7 +64,7 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
   const { getTheme } = await themeSessionResolver(request);
   return {
     theme: getTheme(),
-    env: (context["cloudflare"] as AppLoadContext).env as Env,
+    env: context.env as Env,
   };
 }
 
