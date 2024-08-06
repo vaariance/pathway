@@ -70,176 +70,192 @@ export function Body({ className, ...props }: BodyProps) {
     return "$" + Number(exec_fee).toFixed(4);
   };
   return (
-    <Wrapper<HTMLDivElement>>
-      {(
-        is_connected,
-        set_error,
-        set_amount,
-        set_address,
-        path,
-        on_accept,
-        accepted,
-        change_route,
-        change_chain,
-        quote
-      ) => (
-        <Card
-          className={cn(
-            "w-full md:w-11/12 max-w-md mx-auto absolute md:top-1/2 md:left-1/2 md:transform md:-translate-x-1/2 md:-translate-y-1/2 h-full md:h-auto pt-24 md:pt-0",
-            className
-          )}
-          {...props}
-        >
-          <CardHeader>
-            <CardTitle>The Path</CardTitle>
-            <CardDescription>
-              Walk your USDC from
-              <span className="capitalize">&nbsp;{path.from}</span> to
-              <span className="capitalize">&nbsp;{path?.to?.value}</span>.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            <div className="rounded-md border p-4 space-y-4">
-              <div className=" flex items-center space-x-4 mb-4">
-                <>{svg_assets.usdc("aspect-square w-10 h-10")}</>
-                <div className="flex-1 space-y-1">
-                  <p className="text-sm font-medium leading-none">USDC</p>
-                </div>
-                <ChainSelection handle_change={change_route} path={path} />
-              </div>
-              <Label htmlFor="amount" className="text-muted-foreground">
-                Enter an Amount:
-              </Label>
-              <div className="flex items-center justify-center space-x-2 pb-6">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 shrink-0 rounded-full"
-                  onClick={() =>
-                    set_amount(Math.max(0, Number(path.amount) - 1).toString())
-                  }
-                  disabled={Number(path.amount) <= 0}
-                >
-                  <Minus className="h-4 w-4" />
-                  <span className="sr-only">Decrease</span>
-                </Button>
-                <div className="flex-1 text-center">
-                  <ExoticInput
-                    id="amount"
-                    type="text"
-                    value={path.amount}
-                    className={cn(
-                      Number(path.amount) > Number(path.balance) &&
-                        "text-red-500"
-                    )}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (/^\d*\.?\d*$/.test(value)) {
-                        set_amount(value);
-                      }
-                    }}
-                  />
-                  <div className="text-[0.70rem] uppercase text-muted-foreground">
-                    USDC
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        <Wrapper<HTMLDivElement>>
+          {(
+            is_connected,
+            set_error,
+            set_amount,
+            set_address,
+            path,
+            on_accept,
+            accepted,
+            change_route,
+            change_chain,
+            quote
+          ) => (
+            <Card
+              className={cn(
+                "w-full md:w-11/12 max-w-md mx-auto absolute md:top-1/2 md:left-1/2 md:transform md:-translate-x-1/2 md:-translate-y-1/2 h-full md:h-auto pt-24 md:pt-0",
+                className
+              )}
+              {...props}
+            >
+              <CardHeader>
+                <CardTitle>The Path</CardTitle>
+                <CardDescription>
+                  Walk your USDC from
+                  <span className="capitalize">&nbsp;{path.from}</span> to
+                  <span className="capitalize">&nbsp;{path?.to?.value}</span>.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4">
+                <div className="rounded-md border p-4 space-y-4">
+                  <div className=" flex items-center space-x-4 mb-4">
+                    <>{svg_assets.usdc("aspect-square w-10 h-10")}</>
+                    <div className="flex-1 space-y-1">
+                      <p className="text-sm font-medium leading-none">USDC</p>
+                    </div>
+                    <ChainSelection handle_change={change_route} path={path} />
                   </div>
+                  <Label htmlFor="amount" className="text-muted-foreground">
+                    Enter an Amount:
+                  </Label>
+                  <div className="flex items-center justify-center space-x-2 pb-6">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 rounded-full"
+                      onClick={() =>
+                        set_amount(
+                          Math.max(0, Number(path.amount) - 1).toString()
+                        )
+                      }
+                      disabled={Number(path.amount) <= 0}
+                    >
+                      <Minus className="h-4 w-4" />
+                      <span className="sr-only">Decrease</span>
+                    </Button>
+                    <div className="flex-1 text-center">
+                      <ExoticInput
+                        id="amount"
+                        type="text"
+                        value={path.amount}
+                        className={cn(
+                          Number(path.amount) > Number(path.balance) &&
+                            "text-red-500"
+                        )}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (/^\d*\.?\d*$/.test(value)) {
+                            set_amount(value);
+                          }
+                        }}
+                      />
+                      <div className="text-[0.70rem] uppercase text-muted-foreground">
+                        USDC
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 rounded-full"
+                      onClick={() =>
+                        set_amount((Number(path.amount) + 1).toString())
+                      }
+                      disabled={Number(path.amount) > Number(path.balance)}
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span className="sr-only">Increase</span>
+                    </Button>
+                  </div>
+                  <Label htmlFor="address" className="text-muted-foreground">
+                    Enter an Address:
+                  </Label>
+                  <AddressSelection
+                    {...{ path, set_error, set_address, change_chain }}
+                  />
                 </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 shrink-0 rounded-full"
-                  onClick={() =>
-                    set_amount((Number(path.amount) + 1).toString())
-                  }
-                  disabled={Number(path.amount) > Number(path.balance)}
-                >
-                  <Plus className="h-4 w-4" />
-                  <span className="sr-only">Increase</span>
-                </Button>
-              </div>
-              <Label htmlFor="address" className="text-muted-foreground">
-                Enter an Address:
-              </Label>
-              <AddressSelection
-                {...{ path, set_error, set_address, change_chain }}
-              />
-            </div>
-            <ul className="grid gap-3 text-sm text-muted-foreground">
-              <li className="flex items-center justify-between">
-                <span>You will receive:</span>
-                {quote?.ok ? (
-                  <span className="italic">
-                    {"$"}
-                    {Number(
-                      formatUnits(quote.unwrap().estimated_output_amount, 6)
-                    ).toFixed(2)}
-                  </span>
-                ) : (
-                  <span>
-                    <Skeleton className="w-[100px] h-[20px] rounded-full" />
-                  </span>
-                )}
-              </li>
-              <li className="flex items-center justify-between">
-                <span>Estimated fee:</span>
-                {quote?.ok ? (
-                  <span className="italic">{render_quote(quote.unwrap())}</span>
-                ) : (
-                  <span>
-                    <Skeleton className="w-[100px] h-[20px] rounded-full" />
-                  </span>
-                )}
-              </li>
-              <li className="flex items-center justify-between">
-                <span>Ariving in:</span>
-                {quote?.ok ? (
-                  <span className="italic">
-                    {quote.unwrap().estimated_time_in_milliseconds / 1000 < 60
-                      ? Math.round(
-                          quote.unwrap().estimated_time_in_milliseconds / 1000
-                        ) + " sec"
-                      : Math.floor(
-                          quote.unwrap().estimated_time_in_milliseconds / 60000
-                        ) + " mins"}
-                  </span>
-                ) : (
-                  <span>
-                    <Skeleton className="w-[100px] h-[20px] rounded-full" />
-                  </span>
-                )}
-              </li>
-            </ul>
-            <TermsOfService accepted={accepted} on_accept={on_accept} />
-          </CardContent>
-          <CardFooter>
-            <div className="flex-1 space-y-4 justify-center">
-              <Button
-                disabled={
-                  !accepted ||
-                  !is_connected ||
-                  !path.receiver ||
-                  Number(path.amount) <= 0
-                }
-                className="w-full"
-                onClick={() => {}}
-              >
-                <Footprints className="mr-2 h-4 w-4" />{" "}
-                {!is_connected
-                  ? "Wallet Not Connected"
-                  : !path.receiver
-                  ? "Recipient Empty"
-                  : Number(path.amount) <= 0
-                  ? "Amount too Small"
-                  : "Walk"}
-              </Button>
-              <Separator />
-              <p className="text-xs text-muted-foreground text-center">
-                powered by CCTP
-              </p>
-            </div>
-          </CardFooter>
-        </Card>
-      )}
-    </Wrapper>
+                <ul className="grid gap-3 text-sm text-muted-foreground">
+                  <li className="flex items-center justify-between">
+                    <span>You will receive:</span>
+                    {quote?.ok ? (
+                      <span className="italic">
+                        {"$"}
+                        {Number(
+                          formatUnits(quote.unwrap().estimated_output_amount, 6)
+                        ).toFixed(2)}
+                      </span>
+                    ) : (
+                      <span>
+                        <Skeleton className="w-[100px] h-[20px] rounded-full" />
+                      </span>
+                    )}
+                  </li>
+                  <li className="flex items-center justify-between">
+                    <span>Estimated fee:</span>
+                    {quote?.ok ? (
+                      <span className="italic">
+                        {render_quote(quote.unwrap())}
+                      </span>
+                    ) : (
+                      <span>
+                        <Skeleton className="w-[100px] h-[20px] rounded-full" />
+                      </span>
+                    )}
+                  </li>
+                  <li className="flex items-center justify-between">
+                    <span>Ariving in:</span>
+                    {quote?.ok ? (
+                      <span className="italic">
+                        {quote.unwrap().estimated_time_in_milliseconds / 1000 <
+                        60
+                          ? Math.round(
+                              quote.unwrap().estimated_time_in_milliseconds /
+                                1000
+                            ) + " sec"
+                          : Math.floor(
+                              quote.unwrap().estimated_time_in_milliseconds /
+                                60000
+                            ) + " mins"}
+                      </span>
+                    ) : (
+                      <span>
+                        <Skeleton className="w-[100px] h-[20px] rounded-full" />
+                      </span>
+                    )}
+                  </li>
+                </ul>
+                <TermsOfService accepted={accepted} on_accept={on_accept} />
+              </CardContent>
+              <CardFooter>
+                <div className="flex-1 space-y-4 justify-center">
+                  <Button
+                    disabled={
+                      !accepted ||
+                      !is_connected ||
+                      !path.receiver ||
+                      Number(path.amount) <= 0
+                    }
+                    className="w-full"
+                    onClick={() => {}}
+                  >
+                    <Footprints className="mr-2 h-4 w-4" />{" "}
+                    {!is_connected
+                      ? "Wallet Not Connected"
+                      : !path.receiver
+                      ? "Recipient Empty"
+                      : Number(path.amount) <= 0
+                      ? "Amount too Small"
+                      : "Walk"}
+                  </Button>
+                  <Separator />
+                  <p className="text-xs text-muted-foreground text-center">
+                    powered by CCTP
+                  </p>
+                </div>
+              </CardFooter>
+            </Card>
+          )}
+        </Wrapper>
+      </motion.div>
+    </AnimatePresence>
   );
 }
 

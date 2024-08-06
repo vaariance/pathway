@@ -7,9 +7,12 @@ import { Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
 import * as rqp from "react-qrcode-pretty";
 
+import { Theme, useTheme } from "remix-themes";
+
 export function EVMConnector() {
   const { connectors, connect } = useConnect();
   const [wc_uri, set_wc_uri] = useState<string | null>(null);
+  const [cur_theme] = useTheme();
 
   useEffect(() => {
     const wc = connectors.find(
@@ -23,7 +26,7 @@ export function EVMConnector() {
   return (
     <>
       {wc_uri ? (
-        <div className="bg-background dark:bg-foreground rounded-lg p-4 sm:w-fit flex justify-center mb-4">
+        <div className="bg-background rounded-lg p-4 sm:w-fit flex justify-center mb-4">
           <rqp.QrCode
             value={wc_uri}
             variant={{
@@ -31,8 +34,14 @@ export function EVMConnector() {
               body: "dots",
             }}
             color={{
-              eyes: "rgb(5, 46, 22)",
-              body: "rgb(5, 46, 22)",
+              eyes:
+                Theme.DARK === cur_theme
+                  ? "rgb(34, 197, 94)"
+                  : "rgb(5, 46, 22)",
+              body:
+                Theme.DARK === cur_theme
+                  ? "rgb(34, 197, 94)"
+                  : "rgb(5, 46, 22)",
             }}
             padding={0}
             margin={0}
