@@ -23,7 +23,7 @@ export function EVMConnector() {
   return (
     <>
       {wc_uri ? (
-        <div className="bg-background p-4 sm:w-fit flex justify-center mb-4">
+        <div className="bg-background dark:bg-foreground rounded-lg p-4 sm:w-fit flex justify-center mb-4">
           <rqp.QrCode
             value={wc_uri}
             variant={{
@@ -31,8 +31,8 @@ export function EVMConnector() {
               body: "dots",
             }}
             color={{
-              eyes: "rgba(34, 197, 94, 1)",
-              body: "rgba(34, 197, 94, 0.5)",
+              eyes: "rgb(5, 46, 22)",
+              body: "rgb(5, 46, 22)",
             }}
             padding={0}
             margin={0}

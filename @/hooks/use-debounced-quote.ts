@@ -16,20 +16,14 @@ export const useDebouncedQuote = (path: PathContructor) => {
     isWalletConnected,
   } = useChain("noble");
 
-  const get_pathway_options = useCallback(
-    (ignore_viem?: boolean, ignore_cosmos?: boolean) => {
-      return new PathwayOptions({
-        viem_signer: ignore_viem ? undefined : eth_address,
-        noble_signer: ignore_cosmos ? undefined : getOfflineSigner(),
-      });
-    },
-    [eth_address, getOfflineSigner]
-  );
-
   const pathway = useMemo(() => {
     if (!isConnected && !isWalletConnected) return;
-    return new Pathway(get_pathway_options(!isConnected, !isWalletConnected));
-  }, [get_pathway_options, isConnected, isWalletConnected]);
+    const opts = new PathwayOptions({
+      viem_signer: isConnected ? eth_address : undefined,
+      noble_signer: isWalletConnected ? getOfflineSigner() : undefined,
+    });
+    return new Pathway(opts);
+  }, [eth_address, getOfflineSigner, isConnected, isWalletConnected]);
 
   const get_quote = useCallback(
     async (sender_address: Receiver) => {
@@ -52,10 +46,6 @@ export const useDebouncedQuote = (path: PathContructor) => {
         receiver_address: path.receiver as Receiver,
         sender_address,
       });
-      if (!quote?.ok) {
-        console.error(quote?.info);
-      }
-      console.log(quote);
       return quote;
     },
     [
@@ -81,6 +71,7 @@ export const useDebouncedQuote = (path: PathContructor) => {
     if (!eth_address && !noble_address) return;
     const sender_address =
       path.inverse === "ethereum" ? noble_address : eth_address;
+    set_quote(undefined);
     debounced_set_quote(sender_address as Receiver);
   }, [debounced_set_quote, eth_address, noble_address, path.inverse]);
 

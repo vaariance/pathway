@@ -1,9 +1,8 @@
 import { mainnet, arbitrum, base, Chain as ViemChain } from "viem/chains";
-import base_contract from "../../out/deployments/base/latest.json" assert { type: "json" };
-import ethereum_contract from "../../out/deployments/ethereum/latest.json" assert { type: "json" };
-import arbitrum_contract from "../../out/deployments/arbitrum/latest.json" assert { type: "json" };
 
 import { Address } from "viem";
+import { svg_assets } from "@/components/ui/assets";
+import { SVGProps } from "react";
 
 export enum Chains {
   noble = "noble",
@@ -18,13 +17,6 @@ export enum USDC_CONTRACTS {
   arbitrum = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
   base = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
 }
-
-export const PROXY_CONTRACTS = {
-  arbitrum: arbitrum_contract,
-  base: base_contract,
-  ethereum: ethereum_contract,
-  noble: { address: "", abi: {}, bytecode: "" },
-};
 
 export const IMPLEMENTATION_CONTRACT =
   "0x8E8e658E22B12ada97B402fF0b044D6A325013C7";
@@ -60,7 +52,7 @@ export const REVERSE_DOMAINS: Record<number, Chains> = {
 export type ChainMetadata = {
   value: Mode;
   name: string;
-  img_src: string;
+  img_src: (className: string) => SVGProps<SVGSVGElement>;
   fallback: string;
   type: Mode;
 };
@@ -69,29 +61,28 @@ export const chain_data: ChainMetadata[] = [
   {
     value: "noble",
     name: "Noble",
-    img_src: "/noble.svg",
+    img_src: svg_assets.noble,
     fallback: "NB",
     type: "noble",
   },
   {
     value: "ethereum",
     name: "Ethereum",
-    img_src:
-      "https://ethereum.org/_next/static/media/eth-diamond-purple.7929ed26.png",
+    img_src: svg_assets.ethereum,
     fallback: "ETH",
     type: "ethereum",
   },
   {
     value: "arbitrum",
     name: "Arbitrum",
-    img_src: "/arb.svg",
+    img_src: svg_assets.arbitrum,
     fallback: "ARB",
     type: "ethereum",
   },
   {
     value: "base",
     name: "Base",
-    img_src: "/base.svg",
+    img_src: svg_assets.base,
     fallback: "OP",
     type: "ethereum",
   },
@@ -323,9 +314,9 @@ export const ICCTP = [
 
 export const DESTINATION_CALLERS: Record<Chains, Address | string> = {
   [Chains.noble]: "noble1ud8dqwgnrv8gpatl955kx0zjuhpw4n560dv5qy",
-  [Chains.ethereum]: PROXY_CONTRACTS.ethereum.address,
-  [Chains.arbitrum]: PROXY_CONTRACTS.arbitrum.address,
-  [Chains.base]: PROXY_CONTRACTS.base.address,
+  [Chains.ethereum]: "0xeB4EaE8072bF3e2608f05B6812CD95133BF71504",
+  [Chains.arbitrum]: "0xeB4EaE8072bF3e2608f05B6812CD95133BF71504",
+  [Chains.base]: "0xeb4eae8072bf3e2608f05b6812cd95133bf71504",
 };
 
 export const AGGREGATOR_V3_INTERFACE = [
@@ -384,8 +375,6 @@ export const ETH_USD_PRICE_FEEDS: Record<string, Address> = {
   base: "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
 };
 
-export const NOBLE_RPC = "https://noble-rpc.polkachu.com:443";
-
 export const get_pimlico_paymaster_for_chain = (
   chain: Chains,
   api_key: string
@@ -400,4 +389,13 @@ export const get_pimlico_paymaster_for_chain = (
     default:
       throw new Error("Chain not supported");
   }
+};
+
+export const TRANSPORTS = (api_key?: string) => {
+  return {
+    [Chains.ethereum]: `https://eth-mainnet.g.alchemy.com/v2/${api_key}`,
+    [Chains.arbitrum]: `https://arb-mainnet.g.alchemy.com/v2/${api_key}`,
+    [Chains.base]: `https://base-mainnet.g.alchemy.com/v2/${api_key}`,
+    [Chains.noble]: "https://noble-rpc.polkachu.com:443",
+  };
 };

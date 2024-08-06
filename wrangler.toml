@@ -8,8 +8,6 @@ compatibility_date = "2023-04-20"
 minify = true
 node_compat = true
 
-vars = {ENVIRONMENT = "production"}
-
 route = { pattern = "app.thepathway.to", custom_domain = true }
 
 [site]

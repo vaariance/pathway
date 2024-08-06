@@ -14,7 +14,7 @@ import {
   useTheme,
 } from "remix-themes";
 
-import { LoaderFunctionArgs } from "@remix-run/cloudflare";
+import { LoaderFunctionArgs, AppLoadContext } from "@remix-run/cloudflare";
 import clsx from "clsx";
 import { lazy, memo } from "react";
 import { themeSessionResolver } from "./sessions.server";
@@ -23,45 +23,48 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createConfig, http, WagmiProvider } from "wagmi";
 import { arbitrum, base, mainnet } from "wagmi/chains";
 import { coinbaseWallet, injected, walletConnect } from "wagmi/connectors";
+import { Chains, TRANSPORTS } from "@/constants/index";
 
 const LazyCosmosProvider = lazy(async () => await import("./providers"));
 const CosmosProvider = memo(LazyCosmosProvider);
 
 export const project_id = "5874215139e2bf179decb72ddbd9197d";
 
-const config = createConfig({
-  chains: [mainnet, arbitrum, base],
-  connectors: [
-    coinbaseWallet(),
-    injected(),
-    walletConnect({
-      projectId: project_id,
-      disableProviderPing: true,
-      metadata: {
-        name: "Pathway",
-        description: "Pathway - USDC Bridge",
-        url: "https://app.thepathway.to",
-        icons: [
-          "https://app.thepathway.to/favicon.png",
-          "https://app.thepathway.to/logo.svg",
-        ],
-      },
-      showQrModal: false,
-    }),
-  ],
-  transports: {
-    [mainnet.id]: http(),
-    [arbitrum.id]: http(),
-    [base.id]: http(),
-  },
-});
+const config = (alchemy_key: string) =>
+  createConfig({
+    chains: [mainnet, arbitrum, base],
+    connectors: [
+      coinbaseWallet(),
+      injected(),
+      walletConnect({
+        projectId: project_id,
+        disableProviderPing: true,
+        metadata: {
+          name: "Pathway",
+          description: "Pathway - USDC Bridge",
+          url: "https://app.thepathway.to",
+          icons: [
+            "https://app.thepathway.to/favicon.png",
+            "https://app.thepathway.to/logo.svg",
+          ],
+        },
+        showQrModal: false,
+      }),
+    ],
+    transports: {
+      [mainnet.id]: http(TRANSPORTS(alchemy_key)[Chains.ethereum]),
+      [arbitrum.id]: http(TRANSPORTS(alchemy_key)[Chains.arbitrum]),
+      [base.id]: http(TRANSPORTS(alchemy_key)[Chains.base]),
+    },
+  });
 
 const queryClient = new QueryClient();
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request, context }: LoaderFunctionArgs) {
   const { getTheme } = await themeSessionResolver(request);
   return {
     theme: getTheme(),
+    env: (context["cloudflare"] as AppLoadContext).env as Env,
   };
 }
 
@@ -91,7 +94,7 @@ export default function App() {
   return (
     <ThemeProvider specifiedTheme={data.theme} themeAction="/action/set-theme">
       <Layout>
-        <WagmiProvider config={config}>
+        <WagmiProvider config={config(data.env.ALCHEMY_API_KEY)}>
           <QueryClientProvider client={queryClient}>
             <CosmosProvider>
               <Outlet />
