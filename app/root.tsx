@@ -24,6 +24,7 @@ import { createConfig, http, WagmiProvider } from "wagmi";
 import { arbitrum, base, mainnet } from "wagmi/chains";
 import { coinbaseWallet, injected, walletConnect } from "wagmi/connectors";
 import { Chains, TRANSPORTS } from "@/constants/index";
+import { Toaster } from "@/components/ui/toaster";
 
 const LazyCosmosProvider = lazy(async () => await import("./providers"));
 const CosmosProvider = memo(LazyCosmosProvider);
@@ -98,6 +99,7 @@ export default function App() {
           <QueryClientProvider client={queryClient}>
             <CosmosProvider>
               <Outlet />
+              <Toaster />
             </CosmosProvider>
           </QueryClientProvider>
         </WagmiProvider>

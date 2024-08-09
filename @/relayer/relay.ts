@@ -9,21 +9,14 @@ import { SQSClient, SendMessageBatchCommand } from "@aws-sdk/client-sqs";
 import { ALCHEMY_CHAINS, ReceiveMessageFormat } from "./types.js";
 import { Pathway, PathwayOptions } from "../sdk/index.js";
 import {
+  DESTINATION_CALLERS,
   DOMAINS,
   get_pimlico_paymaster_for_chain,
   ICCTP,
   MESSAGE_TRANSMITTERS,
-  PROXY_CONTRACTS,
   VIEM_NETWORKS,
 } from "../constants/index.js";
-import {
-  Abi,
-  Address,
-  encodeFunctionData,
-  http,
-  createClient,
-  Account,
-} from "viem";
+import { Address, encodeFunctionData, http, createClient, Hex } from "viem";
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 
 import { createLightAccountAlchemyClient } from "@alchemy/aa-alchemy";
@@ -44,7 +37,6 @@ async function relay_eth_message(
   const { original_path: path, message_bytes, circle_attestation } = message;
 
   const account = LocalAccountSigner.mnemonicToAccountSigner(mnemonic!);
-  const proxy = PROXY_CONTRACTS[path.to_chain];
 
   const pimlico_paymaster = createClient({
     chain: VIEM_NETWORKS[path.to_chain]!,
@@ -62,7 +54,7 @@ async function relay_eth_message(
     chain: ALCHEMY_CHAINS[path.to_chain]!,
     initCode: "0x",
     signer: account,
-    accountAddress: proxy.address as Address,
+    accountAddress: DESTINATION_CALLERS[path.to_chain] as Address,
     version: "v2.0.0",
     useSimulation: true,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -83,12 +75,6 @@ async function relay_eth_message(
     },
   });
 
-  const options = new PathwayOptions({
-    viem_signer: account.inner as Account,
-    noble_signer: undefined,
-  });
-  const pathway = new Pathway(options);
-
   const filter = await viem_client.createContractEventFilter({
     abi: ICCTP,
     address: MESSAGE_TRANSMITTERS[path.to_chain] as Address,
@@ -105,20 +91,13 @@ async function relay_eth_message(
   }
 
   try {
-    const total_fee = await pathway.estimate_receive_message_eth(message);
-
     const { hash } = await viem_client.sendUserOperation({
       uo: {
-        target: proxy?.address as Address,
+        target: MESSAGE_TRANSMITTERS[path.to_chain] as Address,
         data: encodeFunctionData({
-          abi: proxy?.abi as Abi,
+          abi: ICCTP,
           functionName: "receiveMessage",
-          args: [
-            path.receiver_address,
-            message_bytes,
-            circle_attestation,
-            total_fee.gas.amount,
-          ],
+          args: [message_bytes, circle_attestation as Hex],
         }),
         value: 0n,
       },
@@ -146,11 +125,7 @@ async function relay_noble_message(
   const pathway = new Pathway(options);
 
   try {
-    await pathway.receive_message_noble(message, {
-      outside_caller: (
-        await account.getAccounts()
-      )[0].address as `noble1${string}`,
-    });
+    await pathway.receive_message_noble(message, {});
     return true;
   } catch (error) {
     return false;

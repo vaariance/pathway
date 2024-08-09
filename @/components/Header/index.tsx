@@ -1,5 +1,6 @@
 "use client";
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   HoverCard,
@@ -7,24 +8,23 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { Link } from "@remix-run/react";
 import { Moon, Sun } from "lucide-react";
 import { Theme, useTheme } from "remix-themes";
 import { WalletWrapper } from "../Wrapper/wallet";
-import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
-import { useMediaQuery } from "@/hooks/use-media-query";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const Header = () => {
   const is_desktop = useMediaQuery("(min-width: 768px)");

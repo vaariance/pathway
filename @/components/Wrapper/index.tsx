@@ -11,11 +11,11 @@ import { useSwitchChain } from "wagmi";
 
 import { useExoticBalance } from "@/hooks/use-exotic-balance";
 import { ChainMetadata, chain_data, Mode, PathContructor } from "@/constants/.";
-import { useDebouncedQuote } from "@/hooks/use-debounced-quote";
-import { Result, Quote } from "@/sdk";
+import { usePathway } from "@/hooks/use-pathway";
+import { Result, Quote, ExecutionResponse } from "@/sdk";
+import { ToastAction } from "@radix-ui/react-toast";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type WrapperProps<T> = {
+type WrapperProps = {
   children: (
     is_connected: boolean,
     set_error: Dispatch<Record<string, unknown> | null>,
@@ -26,12 +26,20 @@ type WrapperProps<T> = {
     accepted: boolean,
     change_route: (next: string) => void,
     change_chain: (new_chain: string) => void,
-    quote: Result<Quote, string> | undefined,
-    refresh_quote: () => void
+    actions: {
+      quote: Result<Quote, string> | undefined;
+      refresh_quote: () => void;
+      deposit_for_burn_with_caller: (
+        on_success?: () => void
+      ) => Promise<Result<ExecutionResponse, string> | undefined>;
+      is_depositing: boolean;
+      deposit_error: boolean;
+      deposit_success: boolean;
+    }
   ) => ReactElement;
 };
 
-export const Wrapper = <T extends Element>({ children }: WrapperProps<T>) => {
+export const Wrapper = ({ children }: WrapperProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { chains, switchChain } = useSwitchChain();
@@ -123,7 +131,14 @@ export const Wrapper = <T extends Element>({ children }: WrapperProps<T>) => {
     };
   }, [mode, amount, balance, address, error, chain]);
 
-  const { quote, refresh_quote } = useDebouncedQuote(path);
+  const actions = usePathway({
+    path,
+    toast_action: (text, action) => (
+      <ToastAction altText={text} onClick={action}>
+        {text}
+      </ToastAction>
+    ),
+  });
 
   return children(
     is_connected,
@@ -135,7 +150,6 @@ export const Wrapper = <T extends Element>({ children }: WrapperProps<T>) => {
     accepted,
     change_route,
     change_chain,
-    quote,
-    refresh_quote
+    actions
   );
 };

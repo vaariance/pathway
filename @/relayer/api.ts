@@ -12,7 +12,6 @@ import express from "express";
 import { decode, JwtPayload } from "jsonwebtoken";
 import serverless from "serverless-http";
 import { v4 as uuidv4 } from "uuid";
-import { ReceiveMessageFormat } from "./types.js";
 
 const app = express();
 
@@ -28,7 +27,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(apitoolkitClient.expressMiddleware);
 
-app.get("/message/status/:tx_hash", async function (req, res) {
+app.get("/message/:tx_hash", async function (req, res) {
   const params: GetCommandInput = {
     TableName: process.env.MESSAGE_TABLE,
     Key: {
@@ -39,7 +38,7 @@ app.get("/message/status/:tx_hash", async function (req, res) {
   try {
     const { Item } = await dynamodb_client.send(new GetCommand(params));
     if (Item) {
-      const { ...rest } = Item as ReceiveMessageFormat;
+      const { ...rest } = Item;
       res.json({ ...rest });
     } else {
       res.status(404).json({ error: 'Could not find tx with provided "hash"' });
@@ -55,10 +54,10 @@ app.post("/message/new/:tx_hash", async function (req, res) {
   const tx_hash = req.params.tx_hash.toLowerCase();
 
   if (!message.block_confirmation_in_ms) {
-    return res.status(400).json({ error: "Missing block confirmation in ms" });
+    res.status(400).json({ error: "Missing block confirmation in ms" });
   }
   if (!message.original_path) {
-    return res.status(400).json({ error: "Missing routing path message" });
+    res.status(400).json({ error: "Missing routing path message" });
   }
 
   let params: GetCommandInput | PutCommandInput = {
@@ -77,6 +76,7 @@ app.post("/message/new/:tx_hash", async function (req, res) {
     }
   } catch (error) {
     ReportError(error);
+    res.status(500).json({ error: "Could not retreive tx" });
   }
 
   params = {
@@ -122,7 +122,7 @@ app.post("/create-api-key", async function (req, res) {
   }
 });
 
-app.use((req, res) => {
+app.use((_, res) => {
   return res.status(404).json({
     error: "Not Found",
   });

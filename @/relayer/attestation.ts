@@ -47,7 +47,7 @@ export const handler: SQSHandler = async (event) => {
             "SET status = :status, circle_attestation = :attestation",
           ExpressionAttributeValues: {
             ":status": "attested",
-            ":attestation": attestation,
+            ":attestation": attestation.attestation,
           },
         };
 
@@ -57,7 +57,7 @@ export const handler: SQSHandler = async (event) => {
             ...record,
             body: JSON.stringify({
               ...message,
-              circle_attestation: attestation,
+              circle_attestation: attestation.attestation,
               status: "attested",
             }),
           });

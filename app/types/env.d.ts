@@ -6,6 +6,7 @@ declare const process: {
     NODE_ENV: "development" | "production";
     MESSAGE_TABLE: string;
     API_KEY_TABLE: string;
+    ATTESTATION_QUEUE_URL: string;
     RELAY_QUEUE_URL: string;
     RETRY_QUEUE_URL: string;
     APITOOLKIT_API_KEY: string;
@@ -13,21 +14,18 @@ declare const process: {
     DESTINATION_CALLER_API_KEY: string;
     ALCHEMY_API_KEY: string;
     PIMLICO_API_KEY: string;
+    PATHWAY_API_KEY: string;
   };
 };
 
 interface Env {
   __STATIC_CONTENT: KVNamespace;
   ENVIRONMENT: string;
-  MESSAGE_TABLE: string;
-  API_KEY_TABLE: string;
-  RELAY_QUEUE_URL: string;
-  RETRY_QUEUE_URL: string;
-  APITOOLKIT_API_KEY: string;
   NOBLE_RPC_URL: string;
   DESTINATION_CALLER_API_KEY: string;
   ALCHEMY_API_KEY: string;
   PIMLICO_API_KEY: string;
+  PATHWAY_API_KEY: string;
 }
 
 interface LoadContext {

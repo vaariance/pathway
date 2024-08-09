@@ -1,5 +1,5 @@
 import { Label } from "@/components/ui/label";
-import { Footprints, Minus, Plus, Terminal } from "lucide-react";
+import { Footprints, Loader, Minus, Plus, Terminal } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ExoticInput, Input } from "@/components/ui/input";
@@ -40,7 +40,10 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-import { Wrapper } from "../Wrapper";
+import { chain_data, PathContructor } from "@/constants/.";
+import { Quote } from "@/sdk";
+import { AnimatePresence, motion } from "framer-motion";
+import debounce from "lodash.debounce";
 import {
   ChangeEvent,
   Dispatch,
@@ -48,12 +51,9 @@ import {
   SetStateAction,
   useCallback,
 } from "react";
-import debounce from "lodash.debounce";
-import { chain_data, PathContructor } from "@/constants/.";
-import { motion, AnimatePresence } from "framer-motion";
 import { formatUnits } from "viem";
-import { Quote } from "@/sdk";
 import { svg_assets } from "../ui/assets";
+import { Wrapper } from "../Wrapper";
 
 type BodyProps = React.ComponentProps<typeof Card>;
 
@@ -69,15 +69,30 @@ export function Body({ className, ...props }: BodyProps) {
 
     return "$" + Number(exec_fee).toFixed(4);
   };
+
+  const draw = {
+    hidden: { pathLength: 0, opacity: 0 },
+    visible: (i: number) => {
+      const delay = 1 + i * 0.5;
+      return {
+        pathLength: 1,
+        opacity: 1,
+        transition: {
+          pathLength: { delay, type: "spring", duration: 2, bounce: 0 },
+          opacity: { delay, duration: 0.01 },
+        },
+      };
+    },
+  };
+
   return (
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        animate={{ opacity: 1, visibility: "visible" }}
         transition={{ duration: 0.5 }}
       >
-        <Wrapper<HTMLDivElement>>
+        <Wrapper>
           {(
             is_connected,
             set_error,
@@ -88,7 +103,13 @@ export function Body({ className, ...props }: BodyProps) {
             accepted,
             change_route,
             change_chain,
-            quote
+            {
+              quote,
+              deposit_for_burn_with_caller,
+              is_depositing,
+              deposit_error,
+              deposit_success,
+            }
           ) => (
             <Card
               className={cn(
@@ -204,16 +225,9 @@ export function Body({ className, ...props }: BodyProps) {
                     <span>Ariving in:</span>
                     {quote?.ok ? (
                       <span className="italic">
-                        {quote.unwrap().estimated_time_in_milliseconds / 1000 <
-                        60
-                          ? Math.round(
-                              quote.unwrap().estimated_time_in_milliseconds /
-                                1000
-                            ) + " sec"
-                          : Math.floor(
-                              quote.unwrap().estimated_time_in_milliseconds /
-                                60000
-                            ) + " mins"}
+                        {Math.floor(
+                          quote.unwrap().estimated_time_in_milliseconds / 60000
+                        ) + " mins"}
                       </span>
                     ) : (
                       <span>
@@ -231,19 +245,76 @@ export function Body({ className, ...props }: BodyProps) {
                       !accepted ||
                       !is_connected ||
                       !path.receiver ||
-                      Number(path.amount) <= 0
+                      Number(path.amount) <= 0 ||
+                      is_depositing
                     }
-                    className="w-full"
-                    onClick={() => {}}
+                    className={cn(
+                      "w-full transition-colors duration-700 ease-in-out",
+                      deposit_error && "bg-destructive"
+                    )}
+                    onClick={() =>
+                      deposit_for_burn_with_caller(() => {
+                        set_amount("0");
+                        set_address("");
+                      })
+                    }
                   >
-                    <Footprints className="mr-2 h-4 w-4" />{" "}
-                    {!is_connected
-                      ? "Wallet Not Connected"
-                      : !path.receiver
-                      ? "Recipient Empty"
-                      : Number(path.amount) <= 0
-                      ? "Amount too Small"
-                      : "Walk"}
+                    {!deposit_error && !deposit_success && !is_depositing && (
+                      <Fragment>
+                        <Footprints className="mr-2 h-5 w-5" />{" "}
+                        {!is_connected
+                          ? "Wallet Not Connected"
+                          : !path.receiver
+                          ? "Recipient Empty"
+                          : Number(path.amount) <= 0
+                          ? "Amount too Small"
+                          : "Send"}
+                      </Fragment>
+                    )}
+                    {is_depositing && (
+                      <Loader className="animate-spin h-5 w-5" />
+                    )}
+                    <motion.div
+                      initial="hidden"
+                      animate="visible"
+                      hidden={!deposit_success && !deposit_error}
+                    >
+                      <svg viewBox="0 0 50 50" className="w-10 h-10">
+                        {deposit_success && (
+                          <motion.path
+                            fill="none"
+                            strokeWidth="2"
+                            stroke="white"
+                            d="M14,26 L 22,33 L 35,16"
+                            strokeDasharray="0 1"
+                            variants={draw}
+                            custom={0}
+                          />
+                        )}
+                        {deposit_error && (
+                          <motion.path
+                            fill="none"
+                            strokeWidth="2"
+                            stroke="white"
+                            d="M17,17 L33,33"
+                            strokeDasharray="0 1"
+                            variants={draw}
+                            custom={0}
+                          />
+                        )}
+                        {deposit_error && (
+                          <motion.path
+                            fill="none"
+                            strokeWidth="2"
+                            stroke="white"
+                            d="M33,17 L17,33"
+                            strokeDasharray="0 1"
+                            variants={draw}
+                            custom={0.5}
+                          />
+                        )}
+                      </svg>
+                    </motion.div>
                   </Button>
                   <Separator />
                   <p className="text-xs text-muted-foreground text-center">

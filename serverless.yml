@@ -95,7 +95,7 @@ functions:
           authorizer:
             name: lambdaAuthorizer
       - httpApi:
-          path: /message/status/{tx_hash}
+          path: /message/{tx_hash}
           method: GET
           authorizer:
             name: lambdaAuthorizer

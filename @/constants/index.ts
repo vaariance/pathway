@@ -55,6 +55,7 @@ export type ChainMetadata = {
   img_src: (className: string) => SVGProps<SVGSVGElement>;
   fallback: string;
   type: Mode;
+  block_explorer: string;
 };
 
 export const chain_data: ChainMetadata[] = [
@@ -64,6 +65,7 @@ export const chain_data: ChainMetadata[] = [
     img_src: svg_assets.noble,
     fallback: "NB",
     type: "noble",
+    block_explorer: "http://mintscan.io/noble",
   },
   {
     value: "ethereum",
@@ -71,6 +73,7 @@ export const chain_data: ChainMetadata[] = [
     img_src: svg_assets.ethereum,
     fallback: "ETH",
     type: "ethereum",
+    block_explorer: "https://eth.blockscout.com",
   },
   {
     value: "arbitrum",
@@ -78,6 +81,7 @@ export const chain_data: ChainMetadata[] = [
     img_src: svg_assets.arbitrum,
     fallback: "ARB",
     type: "ethereum",
+    block_explorer: "https://arbitrum.blockscout.com",
   },
   {
     value: "base",
@@ -85,8 +89,12 @@ export const chain_data: ChainMetadata[] = [
     img_src: svg_assets.base,
     fallback: "OP",
     type: "ethereum",
+    block_explorer: "https://base.blockscout.com",
   },
 ];
+
+export const get_explorer = (chain: Chains) =>
+  chain_data.find((c) => c.value === chain)!.block_explorer;
 
 interface AssetInfo {
   chain: string;
@@ -140,7 +148,7 @@ const miliseconds = 60 * 1000;
 
 export const SOURCE_CHAIN_CONFIRMATIONS = {
   ethereum: 14 * miliseconds,
-  noble: 0.35 * miliseconds,
+  noble: 2 * miliseconds,
   arbitrum: 14 * miliseconds,
   base: 14 * miliseconds,
 };
@@ -313,7 +321,7 @@ export const ICCTP = [
 ] as const;
 
 export const DESTINATION_CALLERS: Record<Chains, Address | string> = {
-  [Chains.noble]: "noble1ud8dqwgnrv8gpatl955kx0zjuhpw4n560dv5qy",
+  [Chains.noble]: "noble1nejktfwd47h9hsku6fxtgaxe5hf4pjzz3rq6ek",
   [Chains.ethereum]: "0xeB4EaE8072bF3e2608f05B6812CD95133BF71504",
   [Chains.arbitrum]: "0xeB4EaE8072bF3e2608f05B6812CD95133BF71504",
   [Chains.base]: "0xeb4eae8072bf3e2608f05b6812cd95133bf71504",

@@ -1,9 +1,19 @@
-import { coin } from "@cosmjs/amino";
+import { coins } from "@cosmjs/amino";
 import { fromBech32, toBech32 } from "@cosmjs/encoding";
-import { GeneratedType, OfflineSigner, Registry } from "@cosmjs/proto-signing";
-import { SigningStargateClient, StargateClient } from "@cosmjs/stargate";
+import {
+  GeneratedType,
+  OfflineDirectSigner,
+  Registry,
+} from "@cosmjs/proto-signing";
+import {
+  SigningStargateClient,
+  StargateClient,
+  defaultRegistryTypes,
+} from "@cosmjs/stargate";
+import { ecsign, toBytes, toRpcSig } from "@ethereumjs/util";
 import axios from "axios";
 import { Buffer } from "buffer";
+
 import {
   Account,
   Address,
@@ -24,7 +34,7 @@ import {
   toHex,
 } from "viem";
 import { normalize } from "viem/ens";
-import { ecsign, toBytes, toRpcSig } from "@ethereumjs/util";
+
 import {
   AGGREGATOR_V3_INTERFACE,
   Chains,
@@ -39,10 +49,10 @@ import {
   TRANSPORTS,
   USDC_CONTRACTS,
   VIEM_NETWORKS,
-} from "../constants/index.js";
+} from "../constants/index";
 
-import { MsgDepositForBurnWithCaller, MsgReceiveMessage } from "./generated.js";
-import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import { privateKeyToAccount } from "viem/accounts";
+import { MsgDepositForBurnWithCaller, MsgReceiveMessage } from "./generated";
 
 export type SerializableResult<T, E> =
   | {
@@ -97,8 +107,9 @@ export const Ok = <T>(value: T): Result<T, never> => ({
 });
 
 export const cctp_types: ReadonlyArray<[string, GeneratedType]> = [
-  ["/circle.cctp.v1.MsgDepositForBurnWithCaller", MsgDepositForBurnWithCaller],
-  ["/circle.cctp.v1.MsgReceiveMessage", MsgReceiveMessage],
+  ...defaultRegistryTypes,
+  [TOKEN_MESSENGERS.noble, MsgDepositForBurnWithCaller],
+  [MESSAGE_TRANSMITTERS.noble, MsgReceiveMessage],
 ];
 
 export const create_default_registry = (): Registry => {
@@ -130,9 +141,9 @@ export type ExecutionResponse = {
 };
 
 export type ReceiveMessage = {
-  message_bytes: `0x${string}`;
-  message_hash: `0x${string}`;
-  circle_attestation?: `0x${string}`;
+  message_bytes: Hex;
+  message_hash: Hex;
+  circle_attestation?: Hex;
   block_confirmation_in_ms?: number;
   status: "pending" | "attested" | "received" | "failed";
   destination_block_height_at_deposit: bigint;
@@ -171,9 +182,13 @@ export class PathwayOptions<T, R> {
 
 export class Pathway<
   T extends Account | Address | undefined,
-  R extends OfflineSigner | undefined
+  R extends OfflineDirectSigner | undefined
 > {
   options: PathwayOptions<T, R>;
+  axios_instance = axios.create({
+    baseURL: "https://api.thepathway.to",
+  });
+
   constructor(options: PathwayOptions<T, R>) {
     this.options = options;
   }
@@ -233,16 +248,15 @@ export class Pathway<
     if (!this.options.viem_signer) {
       throw new Error("Viem account is not provided");
     }
+
     let client;
+
     switch (typeof this.options.viem_signer === "string") {
       case true:
         client = createWalletClient({
           account: this.options.viem_signer as Address,
           chain: VIEM_NETWORKS[chain],
-          transport:
-            typeof window !== "undefined" && window.ethereum !== undefined
-              ? custom(window.ethereum!)
-              : http(TRANSPORTS("hPKLnYQOgqDTQuD1_xb7iHDnMlW0GQQk")[chain]),
+          transport: custom(window.ethereum!),
         }).extend(publicActions);
         break;
 
@@ -358,6 +372,22 @@ export class Pathway<
     return await client.getGasPrice();
   }
 
+  async retrive_transaction_receipt(hash: Hex, chain: Chains, skip = false) {
+    const client = this.get_ethereum_client(chain, true);
+    try {
+      if (skip) throw "Skipping waiting time";
+      return await client.waitForTransactionReceipt({
+        hash,
+        confirmations: 2,
+        timeout: 60000,
+      });
+    } catch (error) {
+      return await client.getTransactionReceipt({
+        hash,
+      });
+    }
+  }
+
   /**
    * Converts a hexadecimal address to a Uint8Array.
    *
@@ -447,11 +477,9 @@ export class Pathway<
   ): Promise<ExecutionResponse> {
     const { from_chain, to_chain, receiver_address, amount } = path;
     const client = this.get_ethereum_wallet_client(Chains[path.from_chain]);
-
     const receipient = this.get_bytes_from_bech_32(
       receiver_address as `noble1${string}`
     );
-
     const destination_caller = this.get_bytes_from_bech_32(
       DESTINATION_CALLERS[to_chain] as `noble1${string}`
     );
@@ -469,67 +497,67 @@ export class Pathway<
       ],
     };
 
-    const gas_used = await client.estimateContractGas({
-      ...msg,
-      account: path.sender_address as Address,
-      stateOverride: [
-        {
-          address: USDC_CONTRACTS[from_chain] as Address,
-          stateDiff: [
-            {
-              slot: keccak256(
-                encodeAbiParameters(
-                  [
-                    { name: "x", type: "address" },
-                    { name: "y", type: "bytes32" },
-                  ],
-                  [
-                    TOKEN_MESSENGERS[from_chain] as Address,
-                    keccak256(
-                      encodeAbiParameters(
-                        [
-                          { name: "x", type: "address" },
-                          { name: "y", type: "uint256" },
-                        ],
-                        [path.sender_address as Address, 10n]
-                      )
-                    ),
-                  ]
-                )
-              ),
-              value: numberToHex(maxUint256, { size: 32 }),
-            },
-          ],
-        },
-      ],
-    });
-    const gas_price = await this.get_gas_price(from_chain);
-    const gas_in_usdc = await this.get_usd_quote_for_wei(gas_used * gas_price);
-
-    if (!estimate_only) {
-      const { request } = await client.simulateContract(msg);
-      const hash = await client.writeContract(request);
-      const confirmations = 3;
-      await client.waitForTransactionReceipt({ hash, confirmations });
+    if (estimate_only) {
+      const gas_used = await client.estimateContractGas({
+        ...msg,
+        account: path.sender_address as Address,
+        stateOverride: [
+          {
+            address: USDC_CONTRACTS[from_chain] as Address,
+            stateDiff: [
+              {
+                slot: keccak256(
+                  encodeAbiParameters(
+                    [
+                      { name: "x", type: "address" },
+                      { name: "y", type: "bytes32" },
+                    ],
+                    [
+                      TOKEN_MESSENGERS[from_chain] as Address,
+                      keccak256(
+                        encodeAbiParameters(
+                          [
+                            { name: "x", type: "address" },
+                            { name: "y", type: "uint256" },
+                          ],
+                          [path.sender_address as Address, 10n]
+                        )
+                      ),
+                    ]
+                  )
+                ),
+                value: numberToHex(maxUint256, { size: 32 }),
+              },
+            ],
+          },
+        ],
+      });
+      const gas_price = await this.get_gas_price(from_chain);
+      const gas_in_usdc = await this.get_usd_quote_for_wei(
+        gas_used * gas_price
+      );
       return {
-        hash,
         gas: {
           deposit: {
             amount: gas_in_usdc,
             decimals: 6,
           },
+          receive: {
+            amount: 0n,
+            decimals: 6,
+          },
         },
       };
     }
+    const { request } = await client.simulateContract(msg);
+    const hash = await client.writeContract(request);
+    const receipt = await this.retrive_transaction_receipt(hash, from_chain);
     return {
+      hash,
       gas: {
         deposit: {
-          amount: gas_in_usdc,
-          decimals: 6,
-        },
-        receive: {
-          amount: 0n,
-          decimals: 6,
+          amount: receipt.gasUsed * receipt.effectiveGasPrice,
+          decimals: 18,
         },
       },
     };
@@ -549,9 +577,7 @@ export class Pathway<
     const { from_chain, to_chain, sender_address, receiver_address, amount } =
       path;
     const client = await this.get_noble_wallet_client();
-
     const receipient = this.get_bytes_from_hex(receiver_address as Address);
-
     const destination_caller = this.get_bytes_from_hex(
       DESTINATION_CALLERS[to_chain] as Address
     );
@@ -568,21 +594,22 @@ export class Pathway<
       },
     };
 
-    const gas_used = await client.simulate(sender_address, [msg], "");
+    const [gas_used, rg] = await Promise.all([
+      client.simulate(sender_address, [msg], ""),
+      this.estimate_receive_message_eth(path),
+    ]);
     const fee = {
-      amount: [coin(20000, "uusd")],
-      gas: gas_used.toString(),
+      amount: coins(20000, "uusdc"),
+      gas: Math.ceil(gas_used * 1.5).toString(),
     };
-
-    const rg = await this.estimate_receive_message_eth(path);
 
     if (!estimate_only) {
       const msg_2 = {
         typeUrl: "/cosmos.bank.v1beta1.MsgSend",
         value: {
-          from_address: sender_address,
-          to_address: destination_caller,
-          amount: [{ denom: "uusd", amount: rg.gas.receive.amount.toString() }],
+          fromAddress: sender_address,
+          toAddress: DESTINATION_CALLERS[from_chain],
+          amount: coins(rg.gas.receive.amount.toString(), "uusdc"),
         },
       };
       const result = await client.signAndBroadcast(
@@ -595,14 +622,13 @@ export class Pathway<
         hash: result.transactionHash,
         gas: {
           deposit: {
-            amount: BigInt(gas_used),
+            amount: result.gasUsed,
             decimals: 6,
           },
           receive: rg.gas.receive,
         },
       };
     }
-
     return {
       gas: {
         deposit: {
@@ -626,6 +652,9 @@ export class Pathway<
     const client = await this.get_noble_client();
     const receipt = await client.getTx(hash);
     if (!receipt || receipt?.code !== 0) {
+      if (receipt?.rawLog) {
+        throw new Error(receipt.rawLog);
+      }
       throw new Error(`Transaction failed with code ${receipt?.code}`);
     }
     const b64_message = receipt.events.find(
@@ -647,7 +676,7 @@ export class Pathway<
     );
 
     return {
-      nonce: BigInt(nonce),
+      nonce: BigInt(nonce.split("").slice(1, -1).join("")),
       destination_block_height_at_deposit: block_time,
       message_bytes: toHex(bytes_message),
       message_hash,
@@ -666,25 +695,22 @@ export class Pathway<
     hash: string,
     from_chain: Chains
   ): Promise<Omit<ReceiveMessage, "original_path">> {
-    const client = await this.get_ethereum_client(from_chain);
-    const receipt = await client.getTransactionReceipt({
-      hash: hash as `0x${string}`,
-    });
-
+    const receipt = await this.retrive_transaction_receipt(
+      hash as Hex,
+      from_chain,
+      true
+    );
     const logs = parseEventLogs({
       abi: ICCTP,
       eventName: ["MessageSent", "DepositForBurn"],
       logs: receipt.logs,
     });
-
     const message_bytes = logs.find((log) => log.eventName === "MessageSent")!
       .args.message;
     const nonce = logs.find((log) => log.eventName === "DepositForBurn")!.args
       .nonce;
-
     const message_hash = keccak256(message_bytes as `0x${string}`);
     const block_time = await this.get_noble_block_height();
-
     return {
       nonce,
       destination_block_height_at_deposit: block_time,
@@ -726,8 +752,8 @@ export class Pathway<
     };
     const gas_used = await client.simulate(caller, [msg], "");
     const fee = {
-      amount: [coin(0, "uusd")],
-      gas: gas_used.toString(),
+      amount: coins(15000, "uusdc"),
+      gas: Math.ceil(gas_used * 1.2).toString(),
     };
     if (!simulate_only) {
       const result = await client.signAndBroadcast(caller, [msg], fee, "");
@@ -751,59 +777,6 @@ export class Pathway<
     };
   }
 
-  /**
-   * Receives a message on the Ethereum network.
-   *
-   * @param {ReceiveMessage} receive_message - The receive message object.
-   * @param {boolean} [simulate_only=false] - Whether to simulate the transaction only.
-   * @return {Promise<{ hash?: string, gas: number }>} A promise that resolves to an object containing the transaction hash and gas used.
-   */
-  async receive_message_eth(
-    receive_message: ReceiveMessage,
-    { simulate_only = false }: { simulate_only?: boolean }
-  ): Promise<ExecutionResponse> {
-    const {
-      message_bytes,
-      circle_attestation,
-      original_path: path,
-    } = receive_message;
-
-    const client = this.get_ethereum_wallet_client(path.to_chain);
-
-    const msg = {
-      address: MESSAGE_TRANSMITTERS[path.to_chain] as Address,
-      abi: ICCTP,
-      functionName: "receiveMessage" as never,
-      args: [message_bytes as Address, circle_attestation as Address],
-    };
-
-    const gas_used = await client.estimateContractGas(msg);
-    const gas_price = await this.get_gas_price(path.to_chain);
-    const gas_in_usdc = await this.get_usd_quote_for_wei(gas_used * gas_price);
-
-    if (!simulate_only) {
-      const { request } = await client.simulateContract(msg);
-      const hash = await client.writeContract(request);
-      return {
-        hash,
-        gas: {
-          receive: {
-            amount: gas_in_usdc,
-            decimals: 6,
-          },
-        },
-      };
-    }
-    return {
-      gas: {
-        receive: {
-          amount: gas_in_usdc,
-          decimals: 6,
-        },
-      },
-    };
-  }
-
   /// constructs a receive message with the given path
   /// use state override to disable nonce validation and add dummy attesters
   async estimate_receive_message_eth(path: Path) {
@@ -813,14 +786,10 @@ export class Pathway<
     const nonce = 273585n;
     const version = 0;
     const client = this.get_ethereum_client(to_chain, true);
-
-    const generate_keys = () => {
-      const a = generatePrivateKey();
-      const b = numberToHex(hexToBigInt(a) + 1n, { size: 32 });
-      return [b, a];
-    };
-
-    const [pkeya, pkeyb] = generate_keys();
+    const [pkeya, pkeyb] = [
+      numberToHex(10e18, { size: 32 }),
+      numberToHex(1e18, { size: 32 }),
+    ];
     const random_attester = privateKeyToAccount(pkeya);
     const random_attester_two = privateKeyToAccount(pkeyb);
 
@@ -952,7 +921,7 @@ export class Pathway<
 
     const slope = this.get_fee_for_usdc_amount(amount);
     const msg_bytes = encode_receive_msg();
-    const sig = await get_attestation(msg_bytes);
+    const sig = get_attestation(msg_bytes);
 
     const req = {
       address: MESSAGE_TRANSMITTERS[to_chain] as Address,
@@ -1004,25 +973,17 @@ export class Pathway<
    * @throws {Error} If the receive message is invalid or if any of its values are undefined.
    */
   async submit_pending(
-    receive_message: ReceiveMessage,
+    receive_message: Omit<ReceiveMessage, "circle_attestation">,
     hash: string,
     api_key: string
   ): Promise<void> {
     const values = Object.values(receive_message);
-    if (values.length !== 6) {
-      throw new Error("Invalid receive message");
-    }
-
     for (const item of values) {
       if (typeof item === "undefined") {
         throw new Error("Invalid receive message");
       }
     }
-
-    const axios_instance = axios.create({
-      baseURL: "https://api.thepathway.to",
-    });
-    await axios_instance.post(
+    await this.axios_instance.post(
       `/message/new/${hash}?api_key=${api_key}`,
       receive_message
     );
@@ -1040,51 +1001,42 @@ export class Pathway<
     api_key: string
   ): Promise<Result<ExecutionResponse>> {
     this.validate_path(path);
-    await this.approve(path);
-
     const cleaned_receiver = await this.reverse_ens_name(path.receiver_address);
     if (!cleaned_receiver) {
       return Err(
-        "Unable to deduce receiver, did you provide a valid receipeint?"
+        "Unable to deduce receiver, did you provide a valid receipeint?",
+        Error("Invalid Receipient address or ENS address")
       );
     }
     path.receiver_address = cleaned_receiver as Receiver;
-
-    let execution_response: ExecutionResponse;
+    let exe_res: ExecutionResponse;
     let message: Omit<ReceiveMessage, "original_path">;
-
     try {
       if (path.from_chain === Chains.noble) {
-        execution_response = await this.noble_deposit_for_burn_with_caller(
-          path,
-          {
-            estimate_only: false,
-          }
-        );
-        message = await this.generate_eth_receive_message(
-          execution_response.hash!
-        );
+        exe_res = await this.noble_deposit_for_burn_with_caller(path, {
+          estimate_only: false,
+        });
+        message = await this.generate_eth_receive_message(exe_res.hash!);
       } else {
-        execution_response = await this.eth_deposit_for_burn_with_caller(path, {
+        await this.approve(path);
+        exe_res = await this.eth_deposit_for_burn_with_caller(path, {
           estimate_only: false,
         });
         message = await this.generate_noble_receive_message(
-          execution_response.hash!,
+          exe_res.hash!,
           path.from_chain
         );
       }
-
       await this.submit_pending(
         {
           ...message,
           block_confirmation_in_ms: SOURCE_CHAIN_CONFIRMATIONS[path.from_chain],
           original_path: path,
         },
-        execution_response.hash!,
+        exe_res.hash!,
         api_key
       );
-
-      return Ok(execution_response);
+      return Ok(exe_res);
     } catch (error) {
       return Err("An error occurred while depositing", error);
     }
@@ -1099,11 +1051,11 @@ export class Pathway<
   async get_quote(path: Path): Promise<Result<Quote>> {
     const { from_chain, amount } = path;
     const time = SOURCE_CHAIN_CONFIRMATIONS[from_chain];
-
     const cleaned_receiver = await this.reverse_ens_name(path.receiver_address);
     if (!cleaned_receiver) {
       return Err(
-        "Unable to deduce receiver, did you provide a valid receipeint?"
+        "Unable to deduce receiver, did you provide a valid receipeint?",
+        Error("Invalid Reciepient address or ENS name")
       );
     }
     path.receiver_address = cleaned_receiver as Receiver;
@@ -1128,7 +1080,7 @@ export class Pathway<
           routing_fee: ec.gas.receive,
         },
       });
-    } catch (error: unknown) {
+    } catch (error) {
       return Err("Unable to get quote", error);
     }
   }
@@ -1140,10 +1092,8 @@ export class Pathway<
    * @return {bigint} The fee in usdc for the given amount.
    */
   public get_fee_for_usdc_amount(amount_wei: bigint): bigint {
-    // additional 0.01 for paymaster costs
     const flat_rate_wei = BigInt(0.06 * 1e6);
     const max_fee_wei = BigInt(0.81 * 1e6);
-
     const min_amount_wei = BigInt(10 * 1e6);
     const max_amount_wei = BigInt(15000 * 1e6);
 
@@ -1152,7 +1102,6 @@ export class Pathway<
       Number(max_amount_wei - min_amount_wei);
 
     let fee_wei: bigint;
-
     if (amount_wei <= min_amount_wei) {
       fee_wei = flat_rate_wei;
     } else {
@@ -1160,7 +1109,6 @@ export class Pathway<
         flat_rate_wei +
         BigInt(Math.floor(slope * Number(amount_wei - min_amount_wei)));
     }
-
     return fee_wei > max_fee_wei ? max_fee_wei : fee_wei;
   }
 
@@ -1173,20 +1121,14 @@ export class Pathway<
    */
   async get_usd_quote_for_wei(wei: bigint): Promise<bigint> {
     const client = this.get_ethereum_client(Chains.arbitrum, true);
-
     const round_data = await client.readContract({
       address: "0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612",
       abi: AGGREGATOR_V3_INTERFACE,
       functionName: "latestRoundData",
     });
-
     const price_of_eth_in_usd = BigInt(round_data[1]);
-
-    // Convert to float for more precise calculation
     const eth_value = Number(wei) / 1e18;
     const usd_value = (eth_value * Number(price_of_eth_in_usd)) / 1e8;
-
-    // Convert back to bigint, scaling up by 1e6 for 6 decimal places of precision
     return BigInt(Math.round(usd_value * 1e6));
   }
 }
