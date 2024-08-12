@@ -1,0 +1,32 @@
+{
+  "name": "sdk",
+  "version": "1.0.0",
+  "description": "Pathway SDK",
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "variance.space",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "ts-node": "10.7.0",
+    "bun-types": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@cosmjs/amino": "^0.32.4",
+    "@cosmjs/encoding": "^0.32.4",
+    "@cosmjs/proto-signing": "^0.32.4",
+    "@cosmjs/stargate": "^0.32.4",
+    "@ethereumjs/util": "^9.0.3",
+    "axios": "^1.7.3",
+    "viem": "^2.19.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

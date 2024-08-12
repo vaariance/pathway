@@ -1,0 +1,180 @@
+org: peteruche21
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+app: pathway
+service: pathway
+
+custom: ${file(./env.yml)}
+
+stages:
+  default:
+    params:
+      # sqs parameters
+      attestationQueueName: ${self:service}-${sls:stage}-attestation-queue
+      relayQueueName: ${self:service}-${sls:stage}-relay-queue
+      retryQueueName: ${self:service}-${sls:stage}-retry-queue
+      # dynamodb parameters
+      msgTableName: "${self:service}-${sls:stage}-messages"
+      apiKeyTableName: "${self:service}-${sls:stage}-api-keys"
+      # custom parameters
+      pool_id: ${self:custom.poolId}
+      client_id: ${self:custom.clientId}
+      apitoolkitSecret: ${self:custom.apiToolkitSecret}
+      nobleRpcUrl: ${self:custom.nobleRpcUrl}
+      destinationCallerApiKey: ${self:custom.destinationCallerApiKey}
+      alchemyApiKey: ${self:custom.alchemyApiKey}
+      pimlicoApiKey: ${self:custom.pimlicoApiKey}
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - Fn::GetAtt: [MessageTable, Arn]
+            - Fn::GetAtt: [ApiKeyTable, Arn]
+
+        - Effect: Allow
+          Action:
+            - sqs:SendMessage
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+            - sqs:GetQueueUrl
+          Resource:
+            - Fn::GetAtt: [AttestationQueue, Arn]
+            - Fn::GetAtt: [RelayQueue, Arn]
+            - Fn::GetAtt: [RetryQueue, Arn]
+
+  environment:
+    MESSAGE_TABLE: ${param:msgTableName}
+    API_KEY_TABLE: ${param:apiKeyTableName}
+    ATTESTATION_QUEUE_URL: https://sqs.${aws:region}.amazonaws.com/${aws:accountId}/${param:attestationQueueName}
+    RELAY_QUEUE_URL: https://sqs.${aws:region}.amazonaws.com/${aws:accountId}/${param:relayQueueName}
+    RETRY_QUEUE_URL: https://sqs.${aws:region}.amazonaws.com/${aws:accountId}/${param:retryQueueName}
+    APITOOLKIT_API_KEY: ${param:apitoolkitSecret}
+    NOBLE_RPC_URL: ${param:nobleRpcUrl}
+    DESTINATION_CALLER_API_KEY: ${param:destinationCallerApiKey}
+    ALCHEMY_API_KEY: ${param:alchemyApiKey}
+    PIMLICO_API_KEY: ${param:pimlicoApiKey}
+
+  httpApi:
+    authorizers:
+      lambdaAuthorizer:
+        type: request
+        functionName: authorizer
+      jwtAuthorizer:
+        type: jwt
+        identitySource: $request.header.Authorization
+        issuerUrl: https://cognito-idp.${aws:region}.amazonaws.com/${param:pool_id}
+        audience:
+          - ${param:client_id}
+
+functions:
+  authorizer:
+    handler: authorizer.handler
+
+  scheduler:
+    handler: scheduler.handler
+    events:
+      - schedule: rate(1 minute)
+
+  api:
+    handler: api.handler
+    events:
+      - httpApi:
+          path: /message/new/{tx_hash}
+          method: POST
+          authorizer:
+            name: lambdaAuthorizer
+      - httpApi:
+          path: /message/{tx_hash}
+          method: GET
+          authorizer:
+            name: lambdaAuthorizer
+      - httpApi:
+          path: /create-api-key
+          method: POST
+          authorizer:
+            name: jwtAuthorizer
+
+  attestation:
+    handler: attestation.handler
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - AttestationQueue
+              - Arn
+          functionResponseType: ReportBatchItemFailures
+          batchSize: 10
+
+  relay:
+    handler: relay.handler
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - RelayQueue
+              - Arn
+          functionResponseType: ReportBatchItemFailures
+          batchSize: 10
+
+  retry:
+    handler: retry.handler
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - RetryQueue
+              - Arn
+          functionResponseType: ReportBatchItemFailures
+          batchSize: 10
+
+resources:
+  Resources:
+    MessageTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: tx_hash
+            AttributeType: S
+        KeySchema:
+          - AttributeName: tx_hash
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${param:msgTableName}
+
+    ApiKeyTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: api_key
+            AttributeType: S
+        KeySchema:
+          - AttributeName: api_key
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${param:apiKeyTableName}
+
+    AttestationQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${param:attestationQueueName}
+
+    RelayQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${param:relayQueueName}
+
+    RetryQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${param:retryQueueName}
