@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/sheet";
 
 import { chain_data, PathContructor } from "@/constants";
-import { Quote } from "@pathway/sdk";
+import { Quote } from "thepathway-js";
 import { AnimatePresence, motion } from "framer-motion";
 import debounce from "lodash.debounce";
 import {

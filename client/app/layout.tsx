@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Provider } from "@/components/ui/provider";
-import { TRANSPORTS } from "@pathway/sdk";
+import { TRANSPORTS } from "thepathway-js";
 import { Toaster } from "@/components/ui/toaster";
 import "./tailwind.css";
 

@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useChain } from "@cosmos-kit/react-lite";
 import { useAccount, useBalance, useChainId } from "wagmi";
 import { assets } from "@/constants/registry";
-import { AssetsList } from "@pathway/sdk";
+import { AssetsList } from "thepathway-js";
 
 export const useExoticBalance = (mode: string) => {
   const [cosmos_balance, set_cosmos_balance] = useState<bigint>(BigInt(0));

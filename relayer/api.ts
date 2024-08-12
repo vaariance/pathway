@@ -1,4 +1,4 @@
-import { ReceiveMessage } from "@pathway/sdk";
+import { ReceiveMessage } from "thepathway-js";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
   DynamoDBDocumentClient,

@@ -13,7 +13,7 @@ import { useSwitchChain } from "wagmi";
 import { useExoticBalance } from "@/hooks/use-exotic-balance";
 import { ChainMetadata, chain_data, PathContructor } from "@/constants/.";
 import { usePathway } from "@/hooks/use-pathway";
-import { Result, Quote, Mode, ExecutionResponse } from "@pathway/sdk";
+import { Result, Quote, Mode, ExecutionResponse } from "thepathway-js";
 import { ToastAction } from "@/components/ui/toast";
 
 type WrapperProps = {

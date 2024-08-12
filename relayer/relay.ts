@@ -16,7 +16,7 @@ import {
   ICCTP,
   MESSAGE_TRANSMITTERS,
   VIEM_NETWORKS,
-} from "@pathway/sdk";
+} from "thepathway-js";
 
 import { Address, encodeFunctionData, http, createClient, Hex } from "viem";
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Wallet2 } from "lucide-react";
 import { ExoticDialog } from "@/components/ui/exotic-dialog";
 import { useExoticBalance } from "@/hooks/use-exotic-balance";
-import { Mode } from "@pathway/sdk";
+import { Mode } from "thepathway-js";
 
 type WalletWrapperProps = {
   children: (

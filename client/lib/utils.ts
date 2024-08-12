@@ -1,7 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { isAddress } from "viem";
-import { Mode } from "@pathway/sdk";
+import { Mode } from "thepathway-js";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

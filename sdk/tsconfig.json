@@ -5,8 +5,6 @@
     "target": "esnext",
     "moduleResolution": "bundler",
     "moduleDetection": "force",
-    "allowImportingTsExtensions": true,
-    "noEmit": true,
     "composite": true,
     "strict": true,
     "downlevelIteration": true,
@@ -15,8 +13,14 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "allowJs": true,
-    "types": [
-      "bun-types" // add Bun global
-    ]
-  }
+    "types": ["bun-types"],
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": false,
+    "tsBuildInfoFile": ".cache/tsconfig.tsbuildinfo",
+    "outDir": "./dist",
+    "rootDir": "."
+  },
+  "include": ["./*.ts"],
+  "exclude": ["node_modules", "dist"]
 }

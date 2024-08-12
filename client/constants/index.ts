@@ -1,6 +1,6 @@
 import { svg_assets } from "@/components/ui/assets";
 import { SVGProps } from "react";
-import { Chains, Mode } from "@pathway/sdk";
+import { Chains, Mode } from "thepathway-js";
 
 export type ChainMetadata = {
   value: Mode;

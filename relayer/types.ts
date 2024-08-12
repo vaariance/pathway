@@ -1,4 +1,4 @@
-import type { ReceiveMessage } from "@pathway/sdk";
+import type { ReceiveMessage } from "thepathway-js";
 import { base, mainnet, arbitrum } from "@alchemy/aa-core";
 
 export type ReceiveMessageFormat = Required<

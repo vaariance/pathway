@@ -9,7 +9,7 @@ import {
   Receiver,
   Result,
   Chains,
-} from "@pathway/sdk";
+} from "thepathway-js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { parseUnits } from "viem";
 import debounce from "lodash.debounce";
