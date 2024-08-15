@@ -228,7 +228,9 @@ export function Body({ className, ...props }: BodyProps) {
                     {quote?.ok ? (
                       <span className="italic">
                         {Math.floor(
-                          quote.unwrap().estimated_time_in_milliseconds / 60000
+                          quote.unwrap().estimated_time_in_milliseconds /
+                            60000 +
+                            2
                         ) + " mins"}
                       </span>
                     ) : (
@@ -443,12 +445,12 @@ const TermsOfService = ({
           <div>
             <h3 className="my-2 font-semibold">Fees</h3>
             <p>
-              Users agree to a flat-rate between 0.06 and 0.81 usd calculated
-              from a linearly interpolating slope applied to gas fees on all
-              transactions conducted through the Pathway platform (free for
-              noble). This fee is automatically deducted from each transaction.
-              Pathway reserves the right to modify the fee structure with prior
-              notice to users.
+              Users agree to a flat-rate between $0.16 min and $1.31 max
+              calculated from a linearly interpolating slope applied to gas fees
+              on all transactions conducted through the Pathway platform (free
+              for noble). This fee is automatically deducted from each
+              transaction. Pathway reserves the right to modify the fee
+              structure with prior notice to users.
             </p>
           </div>
           <div>

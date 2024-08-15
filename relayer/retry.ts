@@ -12,6 +12,10 @@ const client = new DynamoDBClient();
 const dynamodb_client = DynamoDBDocumentClient.from(client);
 const sqs_client = new SQSClient();
 
+BigInt.prototype.toJSON = function () {
+  return this.toString();
+};
+
 export const handler: SQSHandler = async (event) => {
   const retry_bundle: SQSRecord[] = [];
   const failed: SQSBatchItemFailure[] = [];
@@ -29,10 +33,15 @@ export const handler: SQSHandler = async (event) => {
       };
       const { Item } = await dynamodb_client.send(new GetCommand(params));
 
-      if (Item && Item.status === "failed") {
+      if (
+        Item &&
+        Item.status === "failed" &&
+        new Date() > new Date(Item.retry_at)
+      ) {
         retry_bundle.push(record);
       }
     } catch (error) {
+      console.error(error);
       failed.push({
         itemIdentifier: record.messageId,
       });
@@ -52,6 +61,7 @@ export const handler: SQSHandler = async (event) => {
         })
       );
     } catch (error) {
+      console.error(error);
       failed.push(...batch.map((item) => ({ itemIdentifier: item.messageId })));
     }
   }

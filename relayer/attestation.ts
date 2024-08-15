@@ -20,6 +20,10 @@ const sqs_client = new SQSClient();
 const base_url = "https://iris-api.circle.com/attestations/";
 const axios_instance: AxiosInstance = axios.create({ baseURL: base_url });
 
+BigInt.prototype.toJSON = function () {
+  return this.toString();
+};
+
 async function get_circle_attestation(
   message: ReceiveMessageFormat
 ): Promise<AttestationResponse> {
@@ -44,7 +48,10 @@ export const handler: SQSHandler = async (event) => {
           TableName: process.env.MESSAGE_TABLE,
           Key: { tx_hash: message.tx_hash },
           UpdateExpression:
-            "SET status = :status, circle_attestation = :attestation",
+            "SET #status = :status, circle_attestation = :attestation",
+          ExpressionAttributeNames: {
+            "#status": "status",
+          },
           ExpressionAttributeValues: {
             ":status": "attested",
             ":attestation": attestation.attestation,
@@ -62,10 +69,11 @@ export const handler: SQSHandler = async (event) => {
             }),
           });
         } catch (error) {
+          console.error(error);
           continue;
         }
       }
-      await new Promise((r) => setTimeout(r, 150));
+      await new Promise((r) => setTimeout(r, 200));
     } catch (error) {
       let response: AttestationResponse | null = null;
       if (isAxiosError(error) && error?.response?.status === 404) {
@@ -75,6 +83,7 @@ export const handler: SQSHandler = async (event) => {
         };
         console.error("Attestation not ready", response);
       } else {
+        console.error(error);
         failed.push({ itemIdentifier: record.messageId });
       }
     }
@@ -93,6 +102,7 @@ export const handler: SQSHandler = async (event) => {
         })
       );
     } catch (error) {
+      console.error(error);
       failed.push(...batch.map((item) => ({ itemIdentifier: item.messageId })));
     }
   }

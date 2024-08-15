@@ -16,6 +16,7 @@ import {
   ICCTP,
   MESSAGE_TRANSMITTERS,
   VIEM_NETWORKS,
+  Chains,
 } from "thepathway-js";
 
 import { Address, encodeFunctionData, http, createClient, Hex } from "viem";
@@ -30,30 +31,31 @@ const dynamodb_client = DynamoDBDocumentClient.from(client);
 const sqs_client = new SQSClient();
 const mnemonic = process.env.DESTINATION_CALLER_API_KEY.split("-").join(" ");
 
+BigInt.prototype.toJSON = function () {
+  return this.toString();
+};
+
 async function relay_eth_message(
-  message: ReceiveMessageFormat
-): Promise<boolean> {
-  const { original_path: path, message_bytes, circle_attestation } = message;
-  const account = LocalAccountSigner.mnemonicToAccountSigner(mnemonic!);
+  messages: SQSRecord[],
+  to_chain: Chains
+): Promise<{ record: SQSRecord; hash: string; success: boolean }[]> {
+  const account = LocalAccountSigner.mnemonicToAccountSigner(mnemonic);
 
   const pimlico_paymaster = createClient({
     // @ts-ignore
-    chain: VIEM_NETWORKS[path.to_chain]!,
+    chain: VIEM_NETWORKS[to_chain]!,
     transport: http(
-      get_pimlico_paymaster_for_chain(
-        path.to_chain,
-        process.env.PIMLICO_API_KEY!
-      )
+      get_pimlico_paymaster_for_chain(to_chain, process.env.PIMLICO_API_KEY!)
     ),
     // @ts-ignore
   }).extend(pimlicoPaymasterActions(ENTRYPOINT_ADDRESS_V07));
 
   const viem_client = await createLightAccountAlchemyClient({
     apiKey: process.env.ALCHEMY_API_KEY,
-    chain: ALCHEMY_CHAINS[path.to_chain]!,
+    chain: ALCHEMY_CHAINS[to_chain]!,
     initCode: "0x",
     signer: account,
-    accountAddress: DESTINATION_CALLERS[path.to_chain] as Address,
+    accountAddress: DESTINATION_CALLERS[to_chain] as Address,
     version: "v2.0.0",
     useSimulation: true,
     customMiddleware: async (userop, _) => {
@@ -73,45 +75,67 @@ async function relay_eth_message(
     },
   });
 
-  const filter = await viem_client.createContractEventFilter({
-    abi: ICCTP,
-    address: MESSAGE_TRANSMITTERS[path.to_chain] as Address,
-    eventName: "MessageReceived",
-    args: {
-      sourceDomain: DOMAINS[path.from_chain],
-      nonce: message.nonce,
-    },
-    fromBlock: message.destination_block_height_at_deposit,
-  });
-  const logs = await viem_client.getFilterLogs({ filter });
-  if (logs.length > 0) {
-    return true;
-  }
+  return Promise.all(
+    messages.map(async (record) => {
+      const {
+        tx_hash,
+        original_path: path,
+        nonce,
+        destination_block_height_at_deposit,
+        message_bytes,
+        circle_attestation,
+      }: ReceiveMessageFormat = JSON.parse(record.body);
 
-  try {
-    const { hash } = await viem_client.sendUserOperation({
-      uo: {
-        target: MESSAGE_TRANSMITTERS[path.to_chain] as Address,
-        data: encodeFunctionData({
-          abi: ICCTP,
-          functionName: "receiveMessage",
-          args: [message_bytes, circle_attestation as Hex],
-        }),
-        value: 0n,
-      },
-    });
+      const filter = await viem_client.createContractEventFilter({
+        abi: ICCTP,
+        address: MESSAGE_TRANSMITTERS[to_chain] as Address,
+        eventName: "MessageReceived",
+        args: {
+          sourceDomain: DOMAINS[path.from_chain],
+          nonce,
+        },
+        fromBlock: destination_block_height_at_deposit,
+        toBlock: "latest",
+      });
+      const logs = await viem_client.getFilterLogs({ filter });
+      if (logs.length > 0) {
+        return { record, hash: tx_hash, success: true };
+      }
 
-    await viem_client.waitForUserOperationTransaction({ hash });
-  } catch (error) {
-    return false;
-  }
-
-  return true;
+      return viem_client
+        .sendUserOperation({
+          uo: {
+            target: MESSAGE_TRANSMITTERS[to_chain] as Address,
+            data: encodeFunctionData({
+              abi: ICCTP,
+              functionName: "receiveMessage",
+              args: [message_bytes, circle_attestation as Hex],
+            }),
+            value: 0n,
+          },
+        })
+        .then(() => {
+          return {
+            record,
+            hash: tx_hash,
+            success: true,
+          };
+        })
+        .catch((error) => {
+          console.error(error);
+          return {
+            record,
+            hash: tx_hash,
+            success: false,
+          };
+        });
+    })
+  );
 }
 
 async function relay_noble_message(
-  message: ReceiveMessageFormat
-): Promise<boolean> {
+  messages: SQSRecord[]
+): Promise<{ record: SQSRecord; hash: string; success: boolean }[]> {
   const account = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic, {
     prefix: "noble",
   });
@@ -123,74 +147,109 @@ async function relay_noble_message(
   });
   const pathway = new Pathway(options);
 
-  try {
-    await pathway.receive_message_noble(message, {});
-    return true;
-  } catch (error) {
-    return false;
-  }
+  return Promise.all(
+    messages.map((record) => {
+      const message: ReceiveMessageFormat = JSON.parse(record.body);
+      return pathway
+        .receive_message_noble(message, {
+          simulate_only: false,
+        })
+        .then(() => ({
+          record,
+          hash: message.tx_hash,
+          success: true,
+        }))
+        .catch((error) => {
+          console.error(error);
+          return {
+            record,
+            hash: message.tx_hash,
+            success: error.toString().includes("nonce already used")
+              ? true
+              : false,
+          };
+        });
+    })
+  );
 }
 
 export const handler: SQSHandler = async (event) => {
   const failed: SQSBatchItemFailure[] = [];
   const retry_bundle: SQSRecord[] = [];
 
-  for (const record of event.Records) {
-    const message: ReceiveMessageFormat = JSON.parse(record.body);
-
-    let success: boolean;
-    if (message.original_path.to_chain === "noble") {
-      success = await relay_noble_message(message);
-    } else {
-      success = await relay_eth_message(message);
+  const split_bundle = event.Records.reduce((acc, item) => {
+    const { original_path: path }: ReceiveMessageFormat = JSON.parse(item.body);
+    if (!acc[path.to_chain]) {
+      acc[path.to_chain] = [];
     }
+    acc[path.to_chain].push(item);
+    return acc;
+  }, {} as Record<Chains, SQSRecord[]>);
 
-    if (success) {
-      const params: UpdateCommandInput = {
-        TableName: process.env.MESSAGE_TABLE,
-        Key: { tx_hash: message.tx_hash },
-        UpdateExpression: "SET status = :status",
-        ExpressionAttributeValues: {
-          ":status": "received",
-        },
-      };
-      try {
-        await dynamodb_client.send(new UpdateCommand(params));
-      } catch (error) {
-        console.error(
-          "Tx relay success but failed to update DynamoDB",
-          error,
-          message
-        );
-        continue;
+  const relay_result = await Promise.all(
+    Object.entries(split_bundle).map(async ([chain, messages]) => {
+      if (chain === "noble") {
+        return relay_noble_message(messages);
+      } else {
+        return relay_eth_message(messages, chain as Chains);
       }
-    } else {
-      const retry_at = new Date(Date.now() + 2 * 60 * 1000).toISOString(); // 2 minutes
-      const params: UpdateCommandInput = {
-        TableName: process.env.MESSAGE_TABLE,
-        Key: { tx_hash: message.tx_hash },
-        UpdateExpression: "SET status = :status, retry_at = :retry_at",
-        ExpressionAttributeValues: {
-          ":status": "failed",
-          ":retry_at": retry_at,
-        },
-      };
+    })
+  ).then((result) => result.flat());
 
-      try {
-        await dynamodb_client.send(new UpdateCommand(params));
-        retry_bundle.push({
-          ...record,
-          body: JSON.stringify({
-            ...message,
-            status: "failed",
-            retry_at,
-          }),
-        });
-      } catch (error) {
-        failed.push({ itemIdentifier: record.messageId });
+  await Promise.all(
+    relay_result.map(async (result) => {
+      const { record, hash, success } = result;
+
+      if (success) {
+        const params: UpdateCommandInput = {
+          TableName: process.env.MESSAGE_TABLE,
+          Key: { tx_hash: hash },
+          UpdateExpression: "SET #status = :status",
+          ExpressionAttributeNames: {
+            "#status": "status",
+          },
+          ExpressionAttributeValues: {
+            ":status": "received",
+          },
+        };
+        return dynamodb_client
+          .send(new UpdateCommand(params))
+          .then(() => {})
+          .catch((error) => console.error(error));
+      } else {
+        const retry_at = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes
+        const params: UpdateCommandInput = {
+          TableName: process.env.MESSAGE_TABLE,
+          Key: { tx_hash: hash },
+          UpdateExpression: "SET #status = :status, retry_at = :retry_at",
+          ExpressionAttributeNames: {
+            "#status": "status",
+          },
+          ExpressionAttributeValues: {
+            ":status": "failed",
+            ":retry_at": retry_at,
+          },
+        };
+
+        return dynamodb_client
+          .send(new UpdateCommand(params))
+          .then(() => {
+            retry_bundle.push({
+              ...record,
+              body: JSON.stringify({
+                ...JSON.parse(record.body),
+                status: "failed",
+                retry_at,
+              }),
+            });
+          })
+          .catch((error) => {
+            console.error(error);
+            failed.push({ itemIdentifier: record.messageId });
+          });
       }
-    }
-  }
+    })
+  );
 
   while (retry_bundle.length > 0) {
     const batch = retry_bundle.splice(0, 10);
@@ -205,6 +264,7 @@ export const handler: SQSHandler = async (event) => {
         })
       );
     } catch (error) {
+      console.error(error);
       failed.push(...batch.map((item) => ({ itemIdentifier: item.messageId })));
     }
   }

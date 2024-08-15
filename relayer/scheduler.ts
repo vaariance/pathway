@@ -12,6 +12,10 @@ const client = new DynamoDBClient();
 const dynamodb_client = DynamoDBDocumentClient.from(client);
 const sqs_client = new SQSClient();
 
+BigInt.prototype.toJSON = function () {
+  return this.toString();
+};
+
 export const handler: Handler = async () => {
   const params: ScanCommandInput = {
     TableName: process.env.MESSAGE_TABLE,
@@ -32,7 +36,7 @@ export const handler: Handler = async () => {
         new Date(item.submitted_at).getTime() + item.block_confirmation_in_ms <
         now
     );
-    console.log(ready);
+
     while (ready && ready.length > 0) {
       await sqs_client.send(
         new SendMessageBatchCommand({

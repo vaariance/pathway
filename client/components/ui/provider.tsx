@@ -18,7 +18,6 @@ import { type ThemeProviderProps } from "next-themes/dist/types";
 const wc_options = {
   projectId: "5874215139e2bf179decb72ddbd9197d",
   disableProviderPing: true,
-  relayUrl: "wss://relay.walletconnect.org",
   metadata: {
     name: "Pathway",
     description: "Pathway - USDC Bridge",
@@ -28,6 +27,7 @@ const wc_options = {
       "https://app.thepathway.to/logo.svg",
     ],
   },
+  showQrModal: false,
 };
 
 const config = (transports: {
@@ -38,11 +38,7 @@ const config = (transports: {
 }) =>
   createConfig({
     chains: [mainnet, arbitrum, base],
-    connectors: [
-      coinbaseWallet(),
-      injected(),
-      walletConnect({ ...wc_options, showQrModal: false }),
-    ],
+    connectors: [coinbaseWallet(), injected(), walletConnect(wc_options)],
     transports: {
       [mainnet.id]: http(transports.ethereum),
       [arbitrum.id]: http(transports.arbitrum),
@@ -68,9 +64,6 @@ export function Provider({
             assetLists={assets}
             wallets={[...leapwallets, ...cosmostationwallets, ...keplrwallets]}
             walletModal={ExoticDialogCosmos}
-            walletConnectOptions={{
-              signClient: wc_options,
-            }}
           >
             {children}
           </ChainProvider>

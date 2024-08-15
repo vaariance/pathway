@@ -117,7 +117,7 @@ export const usePathway = ({ path, toast_action }: UsePathWayProps) => {
       set_is_depositing(true);
       const res = await pathway?.deposit_for_burn_with_caller(
         deposit_path!,
-        ""
+        process.env.NEXT_PUBLIC_PATHWAY_API_KEY
       );
 
       if (res?.ok) {
@@ -139,7 +139,6 @@ export const usePathway = ({ path, toast_action }: UsePathWayProps) => {
         }, 3500);
       }
       if (res?.error) {
-        console.log(res?.info);
         set_error(true);
         toast({
           variant: "destructive",

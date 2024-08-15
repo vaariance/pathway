@@ -17,6 +17,6 @@
     "allowJs": true,
     "types": ["bun-types"]
   },
-  "include": ["**/*.ts", "../process.env.d.ts"],
+  "include": ["**/*.ts", "../global.env.d.ts"],
   "exclude": ["node_modules"]
 }

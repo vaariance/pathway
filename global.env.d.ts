@@ -13,5 +13,10 @@ declare const process: {
     NEXT_PUBLIC_ALCHEMY_API_KEY: string;
     PIMLICO_API_KEY: string;
     PATHWAY_API_KEY: string;
+    NEXT_PUBLIC_PATHWAY_API_KEY: string;
   };
 };
+
+interface BigInt {
+  toJSON: () => string;
+}

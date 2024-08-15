@@ -31,6 +31,7 @@ import {
   parseEventLogs,
   publicActions,
   toHex,
+  TransactionReceipt,
 } from "viem";
 import { normalize } from "viem/ens";
 
@@ -53,11 +54,9 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { MsgDepositForBurnWithCaller, MsgReceiveMessage } from "./generated";
 
-// declare global {
-//   interface Window {
-//     ethereum: any;
-//   }
-// }
+BigInt.prototype.toJSON = function () {
+  return this.toString();
+};
 
 export type SerializableResult<T, E> =
   | {
@@ -359,7 +358,7 @@ export class Pathway<
    * @return {Promise<number>} A promise that resolves to the current Ethereum block height.
    */
   async get_eth_block_height(domain: number): Promise<bigint> {
-    const client = this.get_ethereum_client(REVERSE_DOMAINS[domain]);
+    const client = this.get_ethereum_client(REVERSE_DOMAINS[domain], true);
     return await client.getBlockNumber();
   }
 
@@ -368,19 +367,42 @@ export class Pathway<
     return await client.getGasPrice();
   }
 
-  async retrive_transaction_receipt(hash: Hex, chain: Chains, skip = false) {
+  async retrieve_transaction_receipt(
+    hash: Hex,
+    chain: Chains,
+    skip_tx_wait = false,
+    timeout = 20000,
+    recursive_depth = 0
+  ): Promise<TransactionReceipt> {
+    if (recursive_depth === 3) {
+      throw new Error(
+        "Transaction receipt not found, contact pathway. Tx Hash: " + hash
+      );
+    }
     const client = this.get_ethereum_client(chain);
+    const get_tx_receipt = async () =>
+      await client
+        .getTransactionReceipt({
+          hash,
+        })
+        .catch(() =>
+          this.retrieve_transaction_receipt(
+            hash,
+            chain,
+            false,
+            timeout + 5000,
+            recursive_depth + 1
+          )
+        );
+
+    if (skip_tx_wait) return get_tx_receipt();
     try {
-      if (skip) throw "Skipping waiting time";
       return await client.waitForTransactionReceipt({
         hash,
-        confirmations: 2,
-        timeout: 60000,
+        timeout,
       });
     } catch (error) {
-      return await client.getTransactionReceipt({
-        hash,
-      });
+      return get_tx_receipt();
     }
   }
 
@@ -546,7 +568,11 @@ export class Pathway<
     }
     const { request } = await client.simulateContract(msg);
     const hash = await client.writeContract(request);
-    const receipt = await this.retrive_transaction_receipt(hash, from_chain);
+    const receipt = await this.retrieve_transaction_receipt(
+      hash,
+      from_chain,
+      true
+    );
     return {
       hash,
       gas: {
@@ -690,7 +716,7 @@ export class Pathway<
     hash: string,
     from_chain: Chains
   ): Promise<Omit<ReceiveMessage, "original_path">> {
-    const receipt = await this.retrive_transaction_receipt(
+    const receipt = await this.retrieve_transaction_receipt(
       hash as Hex,
       from_chain,
       true
@@ -1069,7 +1095,7 @@ export class Pathway<
 
       return Ok({
         estimated_time_in_milliseconds: time,
-        estimated_output_amount: amount - BigInt(ec.gas.receive?.amount ?? 0),
+        estimated_output_amount: amount,
         estimated_fee: {
           execution_cost: ec.gas.deposit,
           routing_fee: ec.gas.receive,
@@ -1088,10 +1114,10 @@ export class Pathway<
    * @return {bigint} The fee in usdc for the given amount.
    */
   public get_fee_for_usdc_amount(amount_wei: bigint): bigint {
-    const flat_rate_wei = BigInt(0.06 * 1e6);
-    const max_fee_wei = BigInt(0.81 * 1e6);
+    const flat_rate_wei = BigInt(0.16 * 1e6);
+    const max_fee_wei = BigInt(1.31 * 1e6);
     const min_amount_wei = BigInt(10 * 1e6);
-    const max_amount_wei = BigInt(15000 * 1e6);
+    const max_amount_wei = BigInt(21000 * 1e6);
 
     const slope =
       Number(max_fee_wei - flat_rate_wei) /

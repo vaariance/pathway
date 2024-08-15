@@ -20,6 +20,10 @@ const dynamodb_client = DynamoDBDocumentClient.from(client);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+BigInt.prototype.toJSON = function () {
+  return this.toString();
+};
+
 app.get("/message/:tx_hash", async function (req, res) {
   console.log(req.params.tx_hash);
   const params: GetCommandInput = {
@@ -38,6 +42,7 @@ app.get("/message/:tx_hash", async function (req, res) {
       res.status(404).json({ error: 'Could not find tx with provided "hash"' });
     }
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: "Could not retreive tx" });
   }
 });
@@ -68,6 +73,7 @@ app.post("/message/new/:tx_hash", async function (req, res) {
       res.status(409).json({ error: 'Tx with provided "hash" already exists' });
     }
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: "Could not retreive tx" });
   }
 
@@ -84,6 +90,7 @@ app.post("/message/new/:tx_hash", async function (req, res) {
     await dynamodb_client.send(new PutCommand(params));
     res.json({ hash: tx_hash });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: "Could not sumbit tx" });
   }
 });
@@ -108,14 +115,9 @@ app.post("/create-api-key", async function (req, res) {
     await dynamodb_client.send(new PutCommand(params));
     res.json({ api_key: random_uuid });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: "Could not generate new key" });
   }
-});
-
-app.use((_, res) => {
-  return res.status(404).json({
-    error: "Not Found",
-  });
 });
 
 export const handler = serverless(app);

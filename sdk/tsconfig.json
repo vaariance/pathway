@@ -21,6 +21,6 @@
     "outDir": "./dist",
     "rootDir": "."
   },
-  "include": ["./*.ts"],
+  "include": ["./*.ts", "../global.env.d.ts"],
   "exclude": ["node_modules", "dist"]
 }

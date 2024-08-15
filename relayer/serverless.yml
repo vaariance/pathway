@@ -66,6 +66,7 @@ provider:
     PIMLICO_API_KEY: ${param:pimlicoApiKey}
 
   httpApi:
+    cors: true
     authorizers:
       lambdaAuthorizer:
         type: request
@@ -107,6 +108,7 @@ functions:
 
   attestation:
     handler: attestation.handler
+    timeout: 120
     events:
       - sqs:
           arn:
@@ -115,9 +117,12 @@ functions:
               - Arn
           functionResponseType: ReportBatchItemFailures
           batchSize: 10
+          maximumBatchingWindow: 30
 
   relay:
     handler: relay.handler
+    timeout: 120
+    memorySize: 1536
     events:
       - sqs:
           arn:
@@ -126,9 +131,11 @@ functions:
               - Arn
           functionResponseType: ReportBatchItemFailures
           batchSize: 10
+          maximumBatchingWindow: 30
 
   retry:
     handler: retry.handler
+    timeout: 120
     events:
       - sqs:
           arn:
@@ -137,6 +144,7 @@ functions:
               - Arn
           functionResponseType: ReportBatchItemFailures
           batchSize: 10
+          maximumBatchingWindow: 30
 
 resources:
   Resources:
@@ -168,13 +176,28 @@ resources:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: ${param:attestationQueueName}
+        RedrivePolicy:
+          deadLetterTargetArn:
+            Fn::GetAtt:
+              - RetryQueue
+              - Arn
+          maxReceiveCount: 5
+        VisibilityTimeout: 120
 
     RelayQueue:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: ${param:relayQueueName}
+        RedrivePolicy:
+          deadLetterTargetArn:
+            Fn::GetAtt:
+              - RetryQueue
+              - Arn
+          maxReceiveCount: 5
+        VisibilityTimeout: 150
 
     RetryQueue:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: ${param:retryQueueName}
+        VisibilityTimeout: 120

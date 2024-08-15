@@ -41,6 +41,7 @@ export const handler: Handler<APIGatewayRequestAuthorizerEventV2> = async (
       };
     }
   } catch (error) {
+    console.error(error);
     return {
       isAuthorized: false,
     };
