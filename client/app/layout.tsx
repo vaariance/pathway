@@ -1,19 +1,35 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import { Provider } from "@/components/ui/provider";
-import { TRANSPORTS } from "thepathway-js";
-import { Toaster } from "@/components/ui/toaster";
 import "./tailwind.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Pathway - USDC Bridge",
-  description: "Noble to Ethereum USDC Bridge",
+  description: "Noble <> Ethereum USDC Bridge",
+  keywords: [
+    "pathway",
+    "thepathway",
+    "cosmos usdc bridge",
+    "cosmos bridge",
+    "noble usdc bridge",
+    "usdc bridge",
+  ],
+  authors: [
+    {
+      name: "Peter Anyaogu",
+      url: "https://www.linkedin.com/in/anyaogu/",
+    },
+  ],
 };
 
-const alchemy_api_key = process.env.ALCHEMY_API_KEY;
-const transports = TRANSPORTS(alchemy_api_key);
+export const viewport: Viewport = {
+  minimumScale: 1,
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#2FB85D",
+};
 
 export default function RootLayout({
   children,
@@ -22,20 +38,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <meta charSet="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <body className={inter.className}>
-        <Provider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-          transports={transports}
-        >
-          {children}
-          <Toaster />
-        </Provider>
-      </body>
+      <body className={inter.className}>{children}</body>
     </html>
   );
 }

@@ -71,7 +71,7 @@ const Header = () => {
             >
               <Image
                 src="/logo.svg"
-                alt="Stargaze"
+                alt="pathway logo"
                 className="h-16 dark:invert"
                 height={64}
                 width={120}

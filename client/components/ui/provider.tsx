@@ -23,7 +23,7 @@ const wc_options = {
     description: "Pathway - USDC Bridge",
     url: "https://app.thepathway.to",
     icons: [
-      "https://app.thepathway.to/favicon.png",
+      "https://app.thepathway.to/icon.png",
       "https://app.thepathway.to/logo.svg",
     ],
   },

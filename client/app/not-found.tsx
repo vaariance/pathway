@@ -1,58 +1,32 @@
+import Link from "next/link";
+import PathwayBackground from "@/components/ui/path";
+
 export const runtime = "edge";
 
 export default function NotFound() {
   return (
     <>
       <title>404: This page could not be found.</title>
-      <div style={styles.error}>
-        <div>
-          <style
-            dangerouslySetInnerHTML={{
-              __html: `body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}`,
-            }}
-          />
-          <h1 className="next-error-h1" style={styles.h1}>
-            404
-          </h1>
-          <div style={styles.desc}>
-            <h2 style={styles.h2}>This page could not be found.</h2>
+      <main className="h-screen relative">
+        <PathwayBackground />
+        <div className="z-30 w-11/12 mx-auto absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-auto pt-0 text-foreground">
+          <div>
+            <h1 className="mr-5 pr-6 text-2xl font-medium align-top leadinig-[49px]">
+              Uh oh!
+            </h1>
+            <div className="inline-block">
+              <h2>
+                This page does not exist.&nbsp;
+                <span>
+                  <Link href="/" className="underline text-blue-500">
+                    Go home
+                  </Link>
+                </span>
+              </h2>
+            </div>
           </div>
         </div>
-      </div>
+      </main>
     </>
   );
 }
-
-const styles = {
-  error: {
-    fontFamily:
-      'system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji"',
-    height: "100vh",
-    textAlign: "center",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  desc: {
-    display: "inline-block",
-  },
-
-  h1: {
-    display: "inline-block",
-    margin: "0 20px 0 0",
-    padding: "0 23px 0 0",
-    fontSize: 24,
-    fontWeight: 500,
-    verticalAlign: "top",
-    lineHeight: "49px",
-  },
-
-  h2: {
-    fontSize: 14,
-    fontWeight: 400,
-    lineHeight: "49px",
-    margin: 0,
-  },
-} as const;
