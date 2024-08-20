@@ -38,11 +38,7 @@ const Header = ({ children }: PropsWithChildren) => {
               href="/"
               className="flex items-center transition-transform focus:scale-110 focus:outline-0 focus:drop-shadow-primary"
             >
-              <>
-                {svg_assets["pathway"](
-                  "h-12 dark:text-primary text-foreground"
-                )}
-              </>
+              <>{svg_assets["pathway"]("h-12 text-foreground")}</>
             </Link>
           </div>
           <div className="flex flex-auto items-center justify-end space-x-6">

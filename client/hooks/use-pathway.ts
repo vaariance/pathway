@@ -124,7 +124,7 @@ export const usePathway = ({ path, toast_action }: UsePathWayProps) => {
         set_success(true);
         toast({
           title: "Success!",
-          description: "You transaction was submitted have successfully!",
+          description: "Your transaction was submitted successfully!",
           action: toast_action?.("View", () =>
             window.open(
               get_explorer(deposit_path!.from_chain) + "/tx/" + res.value.hash,

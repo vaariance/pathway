@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Pathway - USDC Bridge",
     short_name: "The Pathway",
     description: "USDC Bridge for Cosmos and EVM chains powered by CCTP",
-    scope: "/",
+    scope: "https://app.thepathway.to",
     start_url: "/",
     display: "standalone",
     background_color: "#0C0B09",
