@@ -23,8 +23,8 @@ const wc_options = {
     description: "Pathway - USDC Bridge",
     url: "https://app.thepathway.to",
     icons: [
-      "https://app.thepathway.to/icon.png",
-      "https://app.thepathway.to/logo.svg",
+      "https://thepathway.to/logo-icon/light.png",
+      "https://thepathway.to/logo-icon/dark.png",
     ],
   },
   showQrModal: false,
@@ -48,27 +48,29 @@ const config = (transports: {
 
 const queryClient = new QueryClient();
 
-export function Provider({
+export function Web3Provider({
   children,
   transports,
-  ...props
-}: ThemeProviderProps & {
+}: {
+  children: React.ReactNode;
   transports: any;
 }) {
   return (
-    <NextThemesProvider {...props}>
-      <WagmiProvider config={config(transports)}>
-        <QueryClientProvider client={queryClient}>
-          <ChainProvider
-            chains={chains}
-            assetLists={assets}
-            wallets={[...leapwallets, ...cosmostationwallets, ...keplrwallets]}
-            walletModal={ExoticDialogCosmos}
-          >
-            {children}
-          </ChainProvider>
-        </QueryClientProvider>
-      </WagmiProvider>
-    </NextThemesProvider>
+    <WagmiProvider config={config(transports)}>
+      <QueryClientProvider client={queryClient}>
+        <ChainProvider
+          chains={chains}
+          assetLists={assets}
+          wallets={[...leapwallets, ...cosmostationwallets, ...keplrwallets]}
+          walletModal={ExoticDialogCosmos}
+        >
+          {children}
+        </ChainProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
   );
+}
+
+export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+  return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
 }

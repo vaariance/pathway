@@ -1,8 +1,10 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
-const PathwayBackground = () => {
+const PathwayBackground = ({ className }: { className?: string }) => {
   const [dimensions, set_dimensions] = useState({ width: 0, height: 0 });
   const grid_size = 50;
 
@@ -32,13 +34,24 @@ const PathwayBackground = () => {
 
   return (
     <Fragment>
-      <div className="fixed inset-0 overflow-hidden z-0">
+      <motion.div
+        animate={{
+          opacity: 1,
+          visibility: "visible",
+        }}
+        initial={{ opacity: 0 }}
+        transition={{ duration: 1 }}
+        className={cn(className, "inset-0 overflow-hidden z-0")}
+      >
         {/* Grid cells */}
         {Array.from({ length: num_rows }).map((_, row) =>
           Array.from({ length: num_columns }).map((_, col) => (
-            <div
+            <motion.div
               key={`cell-${row}-${col}`}
-              className="absolute transition-colors duration-100 hover:bg-primary/50"
+              className="absolute hover:bg-primary/50"
+              whileHover={{
+                transition: { duration: 1, ease: "easeIn" },
+              }}
               style={{
                 left: `${col * grid_size}px`,
                 top: `${row * grid_size}px`,
@@ -70,7 +83,7 @@ const PathwayBackground = () => {
             }}
           />
         ))}
-      </div>
+      </motion.div>
       <div className="fixed inset-0 z-1 pointer-events-none bg-gradient-to-t from-transparent from-50% to-background to-75%" />
     </Fragment>
   );

@@ -1,4 +1,4 @@
-import { Provider } from "@/components/ui/provider";
+import { Web3Provider } from "@/components/ui/provider";
 import { TRANSPORTS } from "thepathway-js";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -11,17 +11,9 @@ export default function AppLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <section>
-      <Provider
-        attribute="class"
-        defaultTheme="system"
-        enableSystem
-        disableTransitionOnChange
-        transports={transports}
-      >
-        {children}
-        <Toaster />
-      </Provider>
-    </section>
+    <Web3Provider transports={transports}>
+      {children}
+      <Toaster />
+    </Web3Provider>
   );
 }

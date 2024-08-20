@@ -34,8 +34,8 @@ export function EVMConnector() {
               body: "dots",
             }}
             color={{
-              eyes: theme !== "light" ? "rgb(34, 197, 94)" : "rgb(5, 46, 22)",
-              body: theme !== "light" ? "rgb(34, 197, 94)" : "rgb(5, 46, 22)",
+              eyes: theme !== "light" ? "#22C55E" : "#052E16",
+              body: theme !== "light" ? "#22C55E" : "#052E16",
             }}
             padding={0}
             margin={0}
