@@ -25,6 +25,6 @@
   "dependencies": {
     "express": "^4.19.2",
     "serverless-http": "^3.2.0",
-    "thepathway-js": "^1.0.5"
+    "thepathway-js": "^1.0.6"
   }
 }

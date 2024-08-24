@@ -21,6 +21,7 @@ import {
   createWalletClient,
   custom,
   encodeAbiParameters,
+  encodeFunctionData,
   encodePacked,
   Hex,
   hexToBigInt,
@@ -37,6 +38,7 @@ import { normalize } from "viem/ens";
 
 import {
   AGGREGATOR_V3_INTERFACE,
+  ALCHEMY_CHAINS,
   Chains,
   DESTINATION_CALLERS,
   DOMAINS,
@@ -53,6 +55,16 @@ import {
 
 import { privateKeyToAccount } from "viem/accounts";
 import { MsgDepositForBurnWithCaller, MsgReceiveMessage } from "./generated";
+import {
+  AlchemySmartAccountClient,
+  createLightAccountAlchemyClient,
+} from "@alchemy/aa-alchemy";
+import {
+  BuildUserOperationParameters,
+  LocalAccountSigner,
+  SmartContractAccount,
+  UserOperationContext,
+} from "@alchemy/aa-core";
 
 BigInt.prototype.toJSON = function () {
   return this.toString();
@@ -299,6 +311,23 @@ export class Pathway<
         registry: create_default_registry(),
       }
     );
+  }
+
+  private get_light_account_public_client(
+    to_chain: Chains
+  ): Promise<AlchemySmartAccountClient> {
+    const account = LocalAccountSigner.privateKeyToAccountSigner(
+      numberToHex(18n, { size: 32 })
+    );
+    return createLightAccountAlchemyClient({
+      apiKey: this.options.alchemy_api_key,
+      chain: ALCHEMY_CHAINS[to_chain],
+      initCode: "0x",
+      signer: account,
+      accountAddress: DESTINATION_CALLERS[to_chain] as Address,
+      version: "v2.0.0",
+      useSimulation: false,
+    });
   }
 
   private async get_allowance(path: Path): Promise<boolean> {
@@ -806,7 +835,7 @@ export class Pathway<
 
     const nonce = 273585n;
     const version = 0;
-    const client = this.get_ethereum_client(to_chain);
+    const client = await this.get_light_account_public_client(to_chain);
     const [pkeya, pkeyb] = [
       numberToHex(10e18, { size: 32 }),
       numberToHex(1e18, { size: 32 }),
@@ -944,37 +973,60 @@ export class Pathway<
     const msg_bytes = encode_receive_msg();
     const sig = get_attestation(msg_bytes);
 
-    const req = {
-      address: MESSAGE_TRANSMITTERS[to_chain] as Address,
-      abi: ICCTP,
-      functionName: "receiveMessage" as never,
-      args: [msg_bytes, sig],
-      account: DESTINATION_CALLERS[to_chain] as Address,
-      stateOverride: [
-        {
-          address: MESSAGE_TRANSMITTERS[to_chain] as Address,
-          stateDiff: [
-            get_nonce_override(),
-            get_threshold_override(),
-            ...get_attester_overrides(),
-          ],
-        },
-        {
-          address: DESTINATION_CALLERS[to_chain] as Address,
-          balance: BigInt(1e18),
-        },
-      ],
+    const req: BuildUserOperationParameters<
+      SmartContractAccount | undefined,
+      UserOperationContext | undefined
+    > = {
+      uo: {
+        target: MESSAGE_TRANSMITTERS[to_chain] as Address,
+        data: encodeFunctionData({
+          abi: ICCTP,
+          functionName: "receiveMessage",
+          args: [msg_bytes, sig],
+        }),
+        value: 0n,
+      },
+      account: client.account!,
+      overrides: {
+        stateOverride: [
+          {
+            address: MESSAGE_TRANSMITTERS[to_chain] as Address,
+            stateDiff: [
+              get_nonce_override(),
+              get_threshold_override(),
+              ...get_attester_overrides(),
+            ],
+          },
+          {
+            address: DESTINATION_CALLERS[to_chain] as Address,
+            balance: BigInt(1e18),
+          },
+        ],
+      },
     };
 
     const estimate_gas = async () => {
       return await Promise.all([
-        client.estimateContractGas(req),
+        client.buildUserOperation(req),
         this.get_gas_price(to_chain),
       ]);
     };
 
-    const [gas_used, gas_price] = await estimate_gas();
-    const gas_in_usdc = await this.get_usd_quote_for_wei(gas_used * gas_price);
+    const [
+      { callGasLimit, preVerificationGas, verificationGasLimit },
+      gas_price,
+    ] = await estimate_gas();
+    const get_gas_to_be_consumed = () => {
+      const gas_used =
+        BigInt(callGasLimit!) +
+        BigInt(preVerificationGas!) +
+        BigInt(verificationGasLimit!);
+      return to_chain === Chains.ethereum ? gas_used * 3n : gas_used;
+    };
+
+    const gas_in_usdc = await this.get_usd_quote_for_wei(
+      get_gas_to_be_consumed() * gas_price
+    );
     return {
       gas: {
         receive: {
@@ -1102,7 +1154,6 @@ export class Pathway<
         },
       });
     } catch (error) {
-      console.log(error);
       return Err("Unable to get quote", error);
     }
   }

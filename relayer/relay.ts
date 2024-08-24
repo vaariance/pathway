@@ -57,7 +57,7 @@ async function relay_eth_message(
     signer: account,
     accountAddress: DESTINATION_CALLERS[to_chain] as Address,
     version: "v2.0.0",
-    useSimulation: true,
+    useSimulation: false,
     customMiddleware: async (userop, _) => {
       const res = await pimlico_paymaster.sponsorUserOperation({
         userOperation: {

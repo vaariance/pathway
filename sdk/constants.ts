@@ -1,4 +1,10 @@
 import { mainnet, arbitrum, base, Chain as ViemChain } from "viem/chains";
+import {
+  base as _base,
+  mainnet as _mainnet,
+  arbitrum as _arbitrum,
+  chains,
+} from "@alchemy/aa-core";
 
 import { Address } from "viem";
 
@@ -347,4 +353,11 @@ export const TRANSPORTS = (api_key?: string) => {
     [Chains.base]: `https://base-mainnet.g.alchemy.com/v2/${api_key}`,
     [Chains.noble]: "https://noble-rpc.polkachu.com:443",
   };
+};
+
+export const ALCHEMY_CHAINS: Record<Chains, any> = {
+  ethereum: _mainnet,
+  arbitrum: _arbitrum,
+  base: _base,
+  noble: undefined,
 };

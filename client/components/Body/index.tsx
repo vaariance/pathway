@@ -449,8 +449,9 @@ const TermsOfService = ({
               calculated from a linearly interpolating slope applied to gas fees
               on all transactions conducted through the Pathway platform (free
               for noble). This fee is automatically deducted from each
-              transaction. Pathway reserves the right to modify the fee
-              structure with prior notice to users.
+              transaction gas and should not confused with the actual gas fees
+              paid in both the origin and destination chains. Pathway reserves
+              the right to modify the fee structure with prior notice to users.
             </p>
           </div>
           <div>

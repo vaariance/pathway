@@ -25,7 +25,6 @@ BigInt.prototype.toJSON = function () {
 };
 
 app.get("/message/:tx_hash", async function (req, res) {
-  console.log(req.params.tx_hash);
   const params: GetCommandInput = {
     TableName: process.env.MESSAGE_TABLE,
     Key: {

@@ -73,9 +73,6 @@ export const usePathway = ({ path, toast_action }: UsePathWayProps) => {
       if (!path || !pathway) return;
 
       const q = await pathway?.get_quote(path);
-      if (q.error) {
-        console.log(q.info);
-      }
       return q;
     },
     [construct_path, pathway]
@@ -106,13 +103,12 @@ export const usePathway = ({ path, toast_action }: UsePathWayProps) => {
       if (!path || !pathway) return;
       if (!quote?.ok) {
         toast({
-          title: "Uh oh! Gas Quote is unavailable.",
+          title: "Please Note! Gas Quote is incosistent.",
           description:
-            "There was a problem calcluating Gas Quote. Please refresh.",
+            "The Gas quote is inconsistent. Your actual fee may differ.",
           action: toast_action?.("Refresh", refresh_quote),
           duration: 3500,
         });
-        return;
       }
       set_is_depositing(true);
       const res = await pathway?.deposit_for_burn_with_caller(
