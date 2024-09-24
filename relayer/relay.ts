@@ -12,44 +12,48 @@ import {
   PathwayOptions,
   DESTINATION_CALLERS,
   DOMAINS,
-  get_pimlico_paymaster_for_chain,
   ICCTP,
   MESSAGE_TRANSMITTERS,
-  VIEM_NETWORKS,
   Chains,
 } from "thepathway-js";
 
-import { Address, encodeFunctionData, http, createClient, Hex } from "viem";
+import { Address, encodeFunctionData, Hex, toHex } from "viem";
 import { DirectSecp256k1HdWallet } from "@cosmjs/proto-signing";
 import { createLightAccountAlchemyClient } from "@alchemy/aa-alchemy";
-import { LocalAccountSigner } from "@alchemy/aa-core";
-import { ENTRYPOINT_ADDRESS_V07 } from "permissionless";
-import { pimlicoPaymasterActions } from "permissionless/actions/pimlico";
+import { LocalAccountSigner, UserOperationRequest_v7 } from "@alchemy/aa-core";
 
-const client = new DynamoDBClient();
-const dynamodb_client = DynamoDBDocumentClient.from(client);
-const sqs_client = new SQSClient();
-const mnemonic = process.env.DESTINATION_CALLER_API_KEY.split("-").join(" ");
+import { createThirdwebClient, hexToBigInt, isHex } from "thirdweb";
+import { getPaymasterAndData, bundleUserOp } from "thirdweb/wallets/smart";
+import { base, arbitrum, mainnet } from "thirdweb/chains";
 
 BigInt.prototype.toJSON = function () {
   return this.toString();
 };
 
+const client = new DynamoDBClient();
+const dynamodb_client = DynamoDBDocumentClient.from(client);
+const sqs_client = new SQSClient();
+const mnemonic = process.env.DESTINATION_CALLER_API_KEY.split("-").join(" ");
+const account = LocalAccountSigner.mnemonicToAccountSigner(mnemonic);
+
+const thirdweb_client = createThirdwebClient({
+  secretKey: process.env.THIRDWEB_SECRET,
+});
+
 async function relay_eth_message(
   messages: SQSRecord[],
   to_chain: Chains
 ): Promise<{ record: SQSRecord; hash: string; success: boolean }[]> {
-  const account = LocalAccountSigner.mnemonicToAccountSigner(mnemonic);
-
-  const pimlico_paymaster = createClient({
-    // @ts-ignore
-    chain: VIEM_NETWORKS[to_chain]!,
-    transport: http(
-      get_pimlico_paymaster_for_chain(to_chain, process.env.PIMLICO_API_KEY!)
-    ),
-    // @ts-ignore
-  }).extend(pimlicoPaymasterActions(ENTRYPOINT_ADDRESS_V07));
-
+  const thirdweb_chain = (() => {
+    switch (to_chain) {
+      case "base":
+        return base;
+      case "arbitrum":
+        return arbitrum;
+      default:
+        return mainnet;
+    }
+  })();
   const viem_client = await createLightAccountAlchemyClient({
     apiKey: process.env.ALCHEMY_API_KEY,
     chain: ALCHEMY_CHAINS[to_chain]!,
@@ -58,15 +62,36 @@ async function relay_eth_message(
     accountAddress: DESTINATION_CALLERS[to_chain] as Address,
     version: "v2.0.0",
     useSimulation: false,
-    customMiddleware: async (userop, _) => {
-      const res = await pimlico_paymaster.sponsorUserOperation({
-        userOperation: {
-          ...userop,
+    customMiddleware: async (userop) => {
+      const callData = await userop.callData;
+      const callGasLimit = await userop.callGasLimit;
+      const verificationGasLimit = await userop.verificationGasLimit;
+      const preVerificationGas = await userop.preVerificationGas;
+      const maxFeePerGas = await userop.maxFeePerGas;
+      const maxPriorityFeePerGas = await userop.maxPriorityFeePerGas;
+      const signature = await userop.signature;
+
+      const res = await getPaymasterAndData({
+        userOp: {
+          sender: await userop.sender,
+          nonce: BigInt(await userop.nonce),
           factory: undefined,
-          factoryData: undefined,
-          callData: await userop.callData,
-          nonce: await userop.nonce,
+          factoryData: "0x",
+          callData: isHex(callData) ? (callData as Hex) : toHex(callData),
+          callGasLimit: BigInt(callGasLimit!),
+          verificationGasLimit: BigInt(verificationGasLimit!),
+          preVerificationGas: BigInt(preVerificationGas!),
+          maxFeePerGas: BigInt(maxFeePerGas!),
+          maxPriorityFeePerGas: BigInt(maxPriorityFeePerGas!),
+          paymaster: undefined,
+          paymasterData: "0x",
+          paymasterVerificationGasLimit: 21000n,
+          paymasterPostOpGasLimit: 21000n,
+          signature: isHex(signature) ? (signature as Hex) : toHex(signature),
         },
+        client: thirdweb_client,
+        chain: thirdweb_chain,
+        entrypointAddress: viem_client.account.getEntryPoint().address,
       });
       return {
         ...userop,
@@ -102,18 +127,49 @@ async function relay_eth_message(
         return { record, hash: tx_hash, success: true };
       }
 
-      return viem_client
-        .sendUserOperation({
-          uo: {
-            target: MESSAGE_TRANSMITTERS[to_chain] as Address,
-            data: encodeFunctionData({
-              abi: ICCTP,
-              functionName: "receiveMessage",
-              args: [message_bytes, circle_attestation as Hex],
-            }),
-            value: 0n,
-          },
-        })
+      const partialOp = await viem_client.buildUserOperation({
+        uo: {
+          target: MESSAGE_TRANSMITTERS[to_chain] as Address,
+          data: encodeFunctionData({
+            abi: ICCTP,
+            functionName: "receiveMessage",
+            args: [message_bytes, circle_attestation as Hex],
+          }),
+          value: 0n,
+        },
+      });
+
+      const signedOp: UserOperationRequest_v7 =
+        await viem_client.signUserOperation({
+          uoStruct: partialOp,
+        });
+
+      return bundleUserOp({
+        userOp: {
+          ...signedOp,
+          factory: undefined,
+          factoryData: "0x",
+          nonce: hexToBigInt(signedOp.nonce),
+          callGasLimit: hexToBigInt(signedOp.callGasLimit),
+          maxFeePerGas: hexToBigInt(signedOp.maxFeePerGas),
+          maxPriorityFeePerGas: hexToBigInt(signedOp.maxPriorityFeePerGas),
+          verificationGasLimit: hexToBigInt(signedOp.verificationGasLimit),
+          preVerificationGas: hexToBigInt(signedOp.preVerificationGas),
+          paymasterData: signedOp.paymasterData!,
+          paymaster: signedOp.paymaster,
+          paymasterVerificationGasLimit: hexToBigInt(
+            signedOp.paymasterVerificationGasLimit!
+          ),
+          paymasterPostOpGasLimit: hexToBigInt(
+            signedOp.paymasterPostOpGasLimit!
+          ),
+        },
+        options: {
+          client: thirdweb_client,
+          chain: thirdweb_chain,
+          entrypointAddress: viem_client.account.getEntryPoint().address,
+        },
+      })
         .then(() => {
           return {
             record,

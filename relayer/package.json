@@ -16,7 +16,6 @@
     "axios": "^1.7.3",
     "bun-types": "latest",
     "jsonwebtoken": "^9.0.2",
-    "permissionless": "^0.1.44",
     "uuid": "^10.0.0"
   },
   "peerDependencies": {
@@ -25,6 +24,7 @@
   "dependencies": {
     "express": "^4.19.2",
     "serverless-http": "^3.2.0",
-    "thepathway-js": "^1.0.6"
+    "thepathway-js": "^1.0.6",
+    "thirdweb": "^5.58.4"
   }
 }

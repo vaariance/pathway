@@ -22,7 +22,7 @@ stages:
       nobleRpcUrl: ${self:custom.nobleRpcUrl}
       destinationCallerApiKey: ${self:custom.destinationCallerApiKey}
       alchemyApiKey: ${self:custom.alchemyApiKey}
-      pimlicoApiKey: ${self:custom.pimlicoApiKey}
+      thirdwebSecret: ${self:custom.thirdwebSecret}
 
 provider:
   name: aws
@@ -63,7 +63,7 @@ provider:
     NOBLE_RPC_URL: ${param:nobleRpcUrl}
     DESTINATION_CALLER_API_KEY: ${param:destinationCallerApiKey}
     ALCHEMY_API_KEY: ${param:alchemyApiKey}
-    PIMLICO_API_KEY: ${param:pimlicoApiKey}
+    THIRDWEB_SECRET: ${param:thirdwebSecret}
 
   httpApi:
     cors: true
@@ -85,7 +85,7 @@ functions:
   scheduler:
     handler: scheduler.handler
     events:
-      - schedule: rate(1 minute)
+      - schedule: rate(2 minutes)
 
   api:
     handler: api.handler
