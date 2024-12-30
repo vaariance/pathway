@@ -2,6 +2,6 @@
 // by running `wrangler types --env-interface CloudflareEnv env.d.ts`
 
 interface CloudflareEnv {
-	ALCHEMY_API_KEY: string;
-	NEXT_PUBLIC_ALCHEMY_API_KEY: string;
+	PIMLICO_API_KEY: string;
+	NEXT_PUBLIC_PIMLICO_API_KEY: string;
 }

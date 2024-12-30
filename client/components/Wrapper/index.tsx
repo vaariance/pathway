@@ -25,6 +25,8 @@ type WrapperProps = {
     path: PathContructor,
     on_accept: () => void,
     accepted: boolean,
+    on_comfortable: () => void,
+    comfortable: boolean,
     change_route: (next: string) => void,
     change_chain: (new_chain: string) => void,
     actions: {
@@ -51,10 +53,12 @@ export const Wrapper = ({ children }: WrapperProps) => {
   const [amount, set_amount] = useState<string>("0");
   const [address, set_address] = useState<string>("");
   const [accepted, set_accepted] = useState(true);
+  const [comfortable, set_comfortable] = useState(true);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       set_accepted(localStorage.getItem("noble-path-tcs-accepted") === "true");
+      set_comfortable(sessionStorage.getItem("noble-path-comfortable") === "true");
     }
   }, []);
 
@@ -79,6 +83,13 @@ export const Wrapper = ({ children }: WrapperProps) => {
     }
   };
 
+  const on_comfortable = () => {
+    set_comfortable(true);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("noble-path-comfortable", "true");
+    }
+  };
+
   const change_route = (next: string) => {
     const chain = chains.find((c) => c.name.toLowerCase().includes(next));
     if (chain) switchChain({ chainId: chain.id });
@@ -87,15 +98,6 @@ export const Wrapper = ({ children }: WrapperProps) => {
 
   const change_chain = (new_chain: string) =>
     set_chain(chain_data.find((chain) => chain.value === new_chain)!);
-
-  // const walk = () => {
-  //   const validationError = validateAddress(address);
-  //   if (validationError) {
-  //     setError(validationError);
-  //   } else {
-  //     onValidAddress(address);
-  //   }
-  // };
 
   const path: PathContructor = useMemo(() => {
     const from = mode;
@@ -150,8 +152,10 @@ export const Wrapper = ({ children }: WrapperProps) => {
     path,
     on_accept,
     accepted,
+    on_comfortable,
+    comfortable,
     change_route,
     change_chain,
-    actions
+    actions,
   );
 };

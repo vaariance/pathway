@@ -41,7 +41,7 @@ export const usePathway = ({ path, toast_action }: UsePathWayProps) => {
     const opts = new PathwayOptions({
       viem_signer: isConnected ? eth_address : undefined,
       noble_signer: isWalletConnected ? getOfflineSignerDirect() : undefined,
-      alchemy_api_key: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY,
+      pimlico_api_key: process.env.NEXT_PUBLIC_PIMLICO_API_KEY,
     });
     return new Pathway(opts);
   }, [eth_address, getOfflineSignerDirect, isConnected, isWalletConnected]);
@@ -73,6 +73,16 @@ export const usePathway = ({ path, toast_action }: UsePathWayProps) => {
       if (!path || !pathway) return;
 
       const q = await pathway?.get_quote(path);
+      if (q.error) {
+        toast({
+          variant: "destructive",
+          title: "Uh oh! Quote failed.",
+          description: `${(q.info as Error).message}`,
+          action: toast_action?.("Retry", () => get_quote(sender_address)),
+          duration: 15000,
+        });
+        console.error(q.info);
+      }
       return q;
     },
     [construct_path, pathway]

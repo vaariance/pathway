@@ -86,12 +86,12 @@ export const Hero = () => {
                 hidden: { opacity: 0, y: 50 },
                 visible: { opacity: 1, y: 0 },
               }}
-              className="border-[0.5px] border-muted-foreground/20 bg-secondary/60 backdrop-blur-lg rounded-xl w-fit px-3 min-h-12 text-center text-sm md:text-base text-foreground inline-flex items-center mb-8 font-light"
+              className="border-[0.5px] border-muted-foreground/20 bg-secondary/60 backdrop-blur-lg rounded-xl w-fit px-3 min-h-12 text-center text-sm md:text-base inline-flex items-center mb-8 font-light"
             >
               <div className="p-1 rounded-full bg-primary mr-2">
                 <Footprints className="w-4 h-4" />
               </div>
-              <p>Now in Beta</p>
+              <p className="font-semibold text-sm text-orange-400">Now live on 7 chains</p>
             </motion.div>
             <div className="flex-1">
               <motion.h1

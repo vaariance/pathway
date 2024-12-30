@@ -1,7 +1,7 @@
 "use client";
 
 import { Label } from "@/components/ui/label";
-import { Footprints, Loader, Minus, Plus, Terminal } from "lucide-react";
+import { AlertCircle, Footprints, Loader, Minus, Plus, Terminal, X } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ExoticInput, Input } from "@/components/ui/input";
@@ -103,6 +103,8 @@ export function Body({ className, ...props }: BodyProps) {
             path,
             on_accept,
             accepted,
+            on_comfortable,
+            comfortable,
             change_route,
             change_chain,
             {
@@ -121,6 +123,35 @@ export function Body({ className, ...props }: BodyProps) {
               {...props}
             >
               <CardHeader>
+                {!comfortable && (
+                  <Alert
+                    className="text-start -translate-y-2 transition-all"
+                    variant="redirect"
+                    role="link"
+                  >
+                    <AlertCircle className="size-4 text-orange-400" />
+                    <AlertDescription>
+                      <div className="flex items-start justify-between">
+                        <span>
+                          Visit{" "}
+                          <a
+                            href="https://express.noble.xyz/"
+                            target="_blank"
+                            className="underline text-blue-500 hover:text-blue-400"
+                          >
+                            express.noble.xyz
+                          </a>{" "}
+                          if your chain is not available in pathway.
+                        </span>
+                        <X
+                          className="size-4 hover:border hover:border-primary/40 rounded-sm"
+                          role="button"
+                          onClick={() => on_comfortable()}
+                        />
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <CardTitle>The Path</CardTitle>
                 <CardDescription>
                   Walk your USDC from

@@ -38,7 +38,6 @@ import { normalize } from "viem/ens";
 
 import {
   AGGREGATOR_V3_INTERFACE,
-  ALCHEMY_CHAINS,
   Chains,
   DESTINATION_CALLERS,
   DOMAINS,
@@ -48,23 +47,22 @@ import {
   REVERSE_DOMAINS,
   SOURCE_CHAIN_CONFIRMATIONS,
   TOKEN_MESSENGERS,
-  TRANSPORTS,
+  RPC_TRANSPORTS,
+  AA_TRANSPORTS,
   USDC_CONTRACTS,
   VIEM_NETWORKS,
+  NATIVE_USD_PRICE_FEEDS,
 } from "./constants";
 
 import { privateKeyToAccount } from "viem/accounts";
+import {
+  entryPoint07Address,
+  createBundlerClient,
+} from "viem/account-abstraction";
 import { MsgDepositForBurnWithCaller, MsgReceiveMessage } from "./generated";
-import {
-  AlchemySmartAccountClient,
-  createLightAccountAlchemyClient,
-} from "@alchemy/aa-alchemy";
-import {
-  BuildUserOperationParameters,
-  LocalAccountSigner,
-  SmartContractAccount,
-  UserOperationContext,
-} from "@alchemy/aa-core";
+
+import { toLightSmartAccount } from "permissionless/accounts";
+import { pimlicoActions } from "permissionless/actions/pimlico";
 
 BigInt.prototype.toJSON = function () {
   return this.toString();
@@ -181,20 +179,20 @@ export type Quote = {
 export class PathwayOptions<T, R> {
   public viem_signer?: T;
   public noble_signer?: R;
-  public alchemy_api_key: string;
+  public pimlico_api_key: string;
 
   constructor({
     viem_signer,
     noble_signer,
-    alchemy_api_key,
+    pimlico_api_key,
   }: {
     viem_signer?: T;
     noble_signer?: R;
-    alchemy_api_key: string;
+    pimlico_api_key: string;
   }) {
     this.viem_signer = viem_signer;
     this.noble_signer = noble_signer;
-    this.alchemy_api_key = alchemy_api_key;
+    this.pimlico_api_key = pimlico_api_key;
   }
 }
 
@@ -252,7 +250,7 @@ export class Pathway<
     }
     return createPublicClient({
       chain: VIEM_NETWORKS[chain],
-      transport: http(TRANSPORTS(this.options.alchemy_api_key)[chain]),
+      transport: http(RPC_TRANSPORTS[chain]),
     });
   }
 
@@ -277,7 +275,7 @@ export class Pathway<
     return createWalletClient({
       account: this.options.viem_signer as Account,
       chain: VIEM_NETWORKS[chain],
-      transport: http(TRANSPORTS(this.options.alchemy_api_key)[chain]),
+      transport: http(RPC_TRANSPORTS[chain]),
     }).extend(publicActions);
   }
 
@@ -291,7 +289,7 @@ export class Pathway<
     if (this.options.noble_signer) {
       return this.get_noble_wallet_client();
     }
-    return StargateClient.connect(TRANSPORTS()[Chains.noble]);
+    return StargateClient.connect(RPC_TRANSPORTS[Chains.noble]);
   }
 
   /**
@@ -305,7 +303,7 @@ export class Pathway<
       throw new Error("Noble offline signer is not provided");
     }
     return SigningStargateClient.connectWithSigner(
-      TRANSPORTS()[Chains.noble],
+      RPC_TRANSPORTS[Chains.noble],
       this.options.noble_signer!,
       {
         registry: create_default_registry(),
@@ -313,21 +311,36 @@ export class Pathway<
     );
   }
 
-  private get_light_account_public_client(
-    to_chain: Chains
-  ): Promise<AlchemySmartAccountClient> {
-    const account = LocalAccountSigner.privateKeyToAccountSigner(
-      numberToHex(18n, { size: 32 })
-    );
-    return createLightAccountAlchemyClient({
-      apiKey: this.options.alchemy_api_key,
-      chain: ALCHEMY_CHAINS[to_chain],
-      initCode: "0x",
-      signer: account,
-      accountAddress: DESTINATION_CALLERS[to_chain] as Address,
-      version: "v2.0.0",
-      useSimulation: false,
+  private async get_smart_account_public_client(to_chain: Chains) {
+    const owner = privateKeyToAccount(numberToHex(18n, { size: 32 }));
+    const client = this.get_ethereum_client(to_chain, true);
+    const rpc = AA_TRANSPORTS(this.options.pimlico_api_key)[to_chain];
+    const account = await toLightSmartAccount({
+      client,
+      entryPoint: {
+        address: entryPoint07Address,
+        version: "0.7",
+      },
+      owner,
+      version: "2.0.0",
+      address: DESTINATION_CALLERS[to_chain] as Address,
     });
+    const bundlerClient = createBundlerClient({
+      account,
+      client,
+      transport: http(rpc),
+      paymaster: true,
+      chain: VIEM_NETWORKS[to_chain],
+    }).extend(
+      pimlicoActions({
+        entryPoint: {
+          address: entryPoint07Address,
+          version: "0.7",
+        },
+      })
+    );
+
+    return bundlerClient;
   }
 
   private async get_allowance(path: Path): Promise<boolean> {
@@ -389,11 +402,6 @@ export class Pathway<
   async get_eth_block_height(domain: number): Promise<bigint> {
     const client = this.get_ethereum_client(REVERSE_DOMAINS[domain], true);
     return await client.getBlockNumber();
-  }
-
-  async get_gas_price(chain: Chains): Promise<bigint> {
-    const client = this.get_ethereum_client(chain, true);
-    return await client.getGasPrice();
   }
 
   async retrieve_transaction_receipt(
@@ -578,9 +586,13 @@ export class Pathway<
           },
         ],
       });
-      const gas_price = await this.get_gas_price(from_chain);
+      const gas_price = await this.get_ethereum_client(
+        from_chain,
+        true
+      ).getGasPrice();
       const gas_in_usdc = await this.get_usd_quote_for_wei(
-        gas_used * gas_price
+        gas_used * gas_price,
+        to_chain
       );
       return {
         gas: {
@@ -835,7 +847,8 @@ export class Pathway<
 
     const nonce = 273585n;
     const version = 0;
-    const client = await this.get_light_account_public_client(to_chain);
+    const client = await this.get_smart_account_public_client(to_chain);
+
     const [pkeya, pkeyb] = [
       numberToHex(10e18, { size: 32 }),
       numberToHex(1e18, { size: 32 }),
@@ -973,10 +986,7 @@ export class Pathway<
     const msg_bytes = encode_receive_msg();
     const sig = get_attestation(msg_bytes);
 
-    const req: BuildUserOperationParameters<
-      SmartContractAccount | undefined,
-      UserOperationContext | undefined
-    > = {
+    const req = {
       uo: {
         target: MESSAGE_TRANSMITTERS[to_chain] as Address,
         data: encodeFunctionData({
@@ -986,7 +996,6 @@ export class Pathway<
         }),
         value: 0n,
       },
-      account: client.account!,
       overrides: {
         stateOverride: [
           {
@@ -1007,30 +1016,68 @@ export class Pathway<
 
     const estimate_gas = async () => {
       return await Promise.all([
-        client.buildUserOperation(req),
-        this.get_gas_price(to_chain),
+        client.prepareUserOperation({
+          calls: [
+            {
+              to: req.uo.target,
+              data: req.uo.data,
+              value: req.uo.value,
+            },
+          ],
+          stateOverride: req.overrides.stateOverride,
+        }),
+        this.get_ethereum_client(to_chain, true).getBlock(),
+        client.getUserOperationGasPrice(),
       ]);
     };
 
     const [
-      { callGasLimit, preVerificationGas, verificationGasLimit },
-      gas_price,
+      op,
+      { baseFeePerGas },
+      {
+        fast: { maxFeePerGas, maxPriorityFeePerGas },
+      },
     ] = await estimate_gas();
-    const get_gas_to_be_consumed = () => {
-      const gas_used =
-        BigInt(callGasLimit!) +
-        BigInt(preVerificationGas!) +
-        BigInt(verificationGasLimit!);
-      return to_chain === Chains.ethereum ? gas_used * 3n : gas_used;
-    };
 
-    const gas_in_usdc = await this.get_usd_quote_for_wei(
-      get_gas_to_be_consumed() * gas_price
+    const {
+      preVerificationGas,
+      callGasLimit,
+      verificationGasLimit,
+      paymasterVerificationGasLimit,
+      paymasterPostOpGasLimit,
+    } = await client.estimateUserOperationGas({
+      ...op,
+      maxFeePerGas,
+      maxPriorityFeePerGas,
+    });
+
+    const gas_price = Math.min(
+      Number(maxFeePerGas),
+      Number(maxPriorityFeePerGas) + Number(baseFeePerGas)
     );
+
+    const gas_consumed =
+      BigInt(preVerificationGas) +
+      BigInt(callGasLimit) +
+      BigInt(verificationGasLimit) +
+      BigInt(paymasterVerificationGasLimit ?? 0) +
+      BigInt(paymasterPostOpGasLimit ?? 0);
+
+    const gas_in_usdc =
+      (await this.get_usd_quote_for_wei(
+        gas_consumed * BigInt(gas_price),
+        to_chain
+      )) + slope;
+
     return {
       gas: {
         receive: {
-          amount: slope + gas_in_usdc,
+          amount:
+            to_chain === Chains.ethereum && gas_in_usdc < 5e6
+              ? BigInt(5e6)
+              : to_chain !== Chains.ethereum && gas_in_usdc > 1e6
+              ? slope
+              : gas_in_usdc,
           decimals: 6,
         },
       },
@@ -1192,10 +1239,11 @@ export class Pathway<
    * @param {bigint} wei - The amount of Wei for which to retrieve the USD quote.
    * @return {Promise<bigint>} A promise that resolves to the USD quote for the given amount of Wei.
    */
-  async get_usd_quote_for_wei(wei: bigint): Promise<bigint> {
-    const client = this.get_ethereum_client(Chains.arbitrum, true);
+  async get_usd_quote_for_wei(wei: bigint, chain?: Chains): Promise<bigint> {
+    const c = chain === Chains.polygon || !chain ? Chains.arbitrum : chain;
+    const client = this.get_ethereum_client(c, true);
     const round_data = await client.readContract({
-      address: "0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612",
+      address: NATIVE_USD_PRICE_FEEDS[c],
       abi: AGGREGATOR_V3_INTERFACE,
       functionName: "latestRoundData",
     });

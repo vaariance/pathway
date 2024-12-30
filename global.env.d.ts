@@ -9,9 +9,9 @@ declare const process: {
     APITOOLKIT_API_KEY: string;
     NOBLE_RPC_URL: string;
     DESTINATION_CALLER_API_KEY: string;
-    ALCHEMY_API_KEY: string;
-    NEXT_PUBLIC_ALCHEMY_API_KEY: string;
     PIMLICO_API_KEY: string;
+    NEXT_PUBLIC_PIMLICO_API_KEY: string;
+    THIRDWEB_SECRET: string;
     PATHWAY_API_KEY: string;
     NEXT_PUBLIC_PATHWAY_API_KEY: string;
   };

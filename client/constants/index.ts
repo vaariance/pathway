@@ -16,7 +16,7 @@ export const chain_data: ChainMetadata[] = [
     value: "noble",
     name: "Noble",
     img_src: svg_assets.noble,
-    fallback: "NB",
+    fallback: "NBL",
     type: "noble",
     block_explorer: "http://mintscan.io/noble",
   },
@@ -40,10 +40,34 @@ export const chain_data: ChainMetadata[] = [
     value: "base",
     name: "Base",
     img_src: svg_assets.base,
-    fallback: "OP",
+    fallback: "BASE",
     type: "ethereum",
     block_explorer: "https://base.blockscout.com",
   },
+  {
+    value: "avalanche",
+    name: "Avalanche",
+    img_src: svg_assets.avalanche,
+    fallback: "AVA",
+    type: "ethereum",
+    block_explorer: "https://snowtrace.io",
+  },
+  {
+    value: "polygon",
+    name: "Polygon",
+    img_src: svg_assets.polygon,
+    fallback: "POL",
+    type: "ethereum",
+    block_explorer: "https://polygon.blockscout.com/",
+  },
+  {
+    value: "optimism",
+    name: "Optimism",
+    img_src: svg_assets.optimism,
+    fallback: "OP",
+    type: "ethereum",
+    block_explorer: "https://optimism.blockscout.com/",
+  }
 ];
 
 export const get_explorer = (chain: Chains) =>

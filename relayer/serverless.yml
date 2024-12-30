@@ -87,6 +87,11 @@ functions:
     events:
       - schedule: rate(2 minutes)
 
+  failsafe:
+    handler: failsafe.handler
+    events:
+      - schedule: rate(12 minutes)
+
   api:
     handler: api.handler
     events:

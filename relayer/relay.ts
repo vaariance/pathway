@@ -5,7 +5,6 @@ import {
   UpdateCommand,
   UpdateCommandInput,
 } from "@aws-sdk/lib-dynamodb";
-import { SQSClient, SendMessageBatchCommand } from "@aws-sdk/client-sqs";
 import { ALCHEMY_CHAINS, ReceiveMessageFormat } from "./types.js";
 import {
   Pathway,
@@ -32,7 +31,6 @@ BigInt.prototype.toJSON = function () {
 
 const client = new DynamoDBClient();
 const dynamodb_client = DynamoDBDocumentClient.from(client);
-const sqs_client = new SQSClient();
 const mnemonic = process.env.DESTINATION_CALLER_API_KEY.split("-").join(" ");
 const account = LocalAccountSigner.mnemonicToAccountSigner(mnemonic);
 
@@ -67,8 +65,8 @@ async function relay_eth_message(
       const callGasLimit = await userop.callGasLimit;
       const verificationGasLimit = await userop.verificationGasLimit;
       const preVerificationGas = await userop.preVerificationGas;
-      const maxFeePerGas = await userop.maxFeePerGas;
-      const maxPriorityFeePerGas = await userop.maxPriorityFeePerGas;
+      const maxFeePerGas = Number(await userop.maxFeePerGas) * 1.2;
+      const maxPriorityFeePerGas = Number(await userop.maxPriorityFeePerGas) * 1.2;
       const signature = await userop.signature;
 
       const res = await getPaymasterAndData({
@@ -273,7 +271,7 @@ export const handler: SQSHandler = async (event) => {
           .then(() => {})
           .catch((error) => console.error(error));
       } else {
-        const retry_at = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes
+        const retry_at = new Date(Date.now() + 5 * 60 * 1000).toDateString(); // 5 minutes
         const params: UpdateCommandInput = {
           TableName: process.env.MESSAGE_TABLE,
           Key: { tx_hash: hash },
@@ -306,24 +304,6 @@ export const handler: SQSHandler = async (event) => {
       }
     })
   );
-
-  while (retry_bundle.length > 0) {
-    const batch = retry_bundle.splice(0, 10);
-    try {
-      await sqs_client.send(
-        new SendMessageBatchCommand({
-          QueueUrl: process.env.RETRY_QUEUE_URL,
-          Entries: batch.map((item) => ({
-            Id: item.messageId,
-            MessageBody: item.body,
-          })),
-        })
-      );
-    } catch (error) {
-      console.error(error);
-      failed.push(...batch.map((item) => ({ itemIdentifier: item.messageId })));
-    }
-  }
 
   return {
     batchItemFailures: failed,
