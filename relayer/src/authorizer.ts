@@ -1,51 +1,47 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import {
-  DynamoDBDocumentClient,
-  GetCommand,
-  GetCommandInput,
-} from "@aws-sdk/lib-dynamodb";
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
+import { DynamoDBDocumentClient, GetCommand, GetCommandInput } from '@aws-sdk/lib-dynamodb'
 import type {
   APIGatewaySimpleAuthorizerResult,
   APIGatewayRequestAuthorizerEventV2,
-  Handler,
-} from "aws-lambda";
+  Handler
+} from 'aws-lambda'
 
-const client = new DynamoDBClient({});
-const dynamodb_client = DynamoDBDocumentClient.from(client);
+const client = new DynamoDBClient({})
+const dynamodb_client = DynamoDBDocumentClient.from(client)
 
 export const handler: Handler<APIGatewayRequestAuthorizerEventV2> = async (
   event
 ): Promise<APIGatewaySimpleAuthorizerResult> => {
-  const api_key = event.queryStringParameters?.api_key;
+  const api_key = event.queryStringParameters?.api_key
 
   if (!api_key) {
     return {
-      isAuthorized: false,
-    };
+      isAuthorized: false
+    }
   }
 
   const params: GetCommandInput = {
     TableName: process.env.API_KEY_TABLE,
-    Key: { api_key },
-  };
+    Key: { api_key }
+  }
 
   try {
-    const { Item } = await dynamodb_client.send(new GetCommand(params));
+    const { Item } = await dynamodb_client.send(new GetCommand(params))
     if (Item) {
       return {
-        isAuthorized: true,
-      };
+        isAuthorized: true
+      }
     } else {
       return {
-        isAuthorized: false,
-      };
+        isAuthorized: false
+      }
     }
   } catch (error) {
-    console.error(error);
+    console.error(error)
     return {
-      isAuthorized: false,
-    };
+      isAuthorized: false
+    }
   }
-};
+}
 
-export default handler;
+export default handler
