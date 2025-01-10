@@ -120,20 +120,18 @@ export const RPC_TRANSPORTS: Record<Chains, string> = {
   [Chains.fuji]: 'https://rpc.ankr.com/avalanche_fuji'
 }
 
-export const AA_TRANSPORTS = (key: string) =>
-  ({
-    [Chains.ethereum]: `https://api.pimlico.io/v2/1/rpc?apikey=${key}`,
-    [Chains.arbitrum]: `https://api.pimlico.io/v2/42161/rpc?apikey=${key}`,
-    [Chains.base]: `https://api.pimlico.io/v2/8453/rpc?apikey=${key}`,
-    [Chains.noble]: undefined,
-    [Chains.optimism]: `https://api.pimlico.io/v2/10/rpc?apikey=${key}`,
-    [Chains.polygon]: `https://api.pimlico.io/v2/137/rpc?apikey=${key}`,
-    [Chains.avalanche]: `https://api.pimlico.io/v2/43114/rpc?apikey=${key}`,
-    // testnets
-    [Chains.grand]: undefined,
-    [Chains.sepolia]: `https://api.pimlico.io/v2/11155111/rpc?apikey=${key}`,
-    [Chains.fuji]: `https://api.pimlico.io/v2/43113/rpc?apikey=${key}`
-  } satisfies Record<Chains, string | undefined>)
+export const AA_TRANSPORT = (chainId?: number) => `https://${chainId}.bundler.thirdweb.com/v2`
+export const AA_TRANSPORT_HEADERS = () => {
+  const secret = process.env.THIRDWEB_SECRET as string | undefined
+  const headers = {
+    'x-client-id': process.env.THIRDWEB_CLIENT_ID,
+    'Content-Type': 'application/json'
+  } as Record<string, string>
+
+  if (secret) headers['x-secret-key'] = secret
+
+  return { headers }
+}
 
 export const MULLTICALLER_WITH_PERMIT: Record<Chains, Address | undefined> = {
   [Chains.ethereum]: '0x',

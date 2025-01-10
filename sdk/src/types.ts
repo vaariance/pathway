@@ -18,19 +18,12 @@ export type Path = {
 export type PathwayOptions<T, R> = {
   viem_signer?: T
   noble_signer?: R
-  pimlico_api_key: string
   platform: 'mainnet' | 'testnet'
 }
 
 export type ExecutionResponse = {
   hash?: string
-  calls?: {
-    order: number
-    type: 'contract' | 'api'
-    data: string
-    chain: Chains
-    api_options?: Record<string, unknown>
-  }[]
+  calls?: Call[]
   gas: {
     deposit?: {
       amount: bigint
@@ -41,6 +34,14 @@ export type ExecutionResponse = {
       decimals: number
     }
   }
+}
+
+export type Call = {
+  order: number
+  type: 'contract' | 'api'
+  data: string
+  chain: Chains
+  api_options?: Record<string, unknown>
 }
 
 export type ReceiveMessage = {

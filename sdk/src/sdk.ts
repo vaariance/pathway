@@ -14,6 +14,8 @@ import {
 import {
   Account,
   Address,
+  Chain,
+  Client,
   concatHex,
   createPublicClient,
   createWalletClient,
@@ -32,12 +34,14 @@ import {
   publicActions,
   slice,
   toHex,
-  TransactionReceipt
+  TransactionReceipt,
+  Transport
 } from 'viem'
 import { normalize } from 'viem/ens'
 
 import {
-  AA_TRANSPORTS,
+  AA_TRANSPORT,
+  AA_TRANSPORT_HEADERS,
   Chains,
   DESTINATION_CALLERS,
   DOMAINS,
@@ -59,9 +63,10 @@ import { createBundlerClient, entryPoint07Address } from 'viem/account-abstracti
 import { privateKeyToAccount } from 'viem/accounts'
 
 import { toLightSmartAccount } from 'permissionless/accounts'
-import { pimlicoActions } from 'permissionless/actions/pimlico'
+import { getUserOpGasFees } from 'thirdweb/wallets/smart'
 import { ecsign, toBytes, toRpcSig } from '@ethereumjs/util'
 import { Err, Ok, Result } from './fn'
+import { createThirdwebClient, defineChain, ThirdwebClient } from 'thirdweb'
 
 BigInt.prototype.toJSON = function () {
   return this.toString()
@@ -77,7 +82,31 @@ export const pathway = <
 >(
   options: PathwayOptions<T, R>
 ) => {
+  const thirdweb_actions =
+    (thirdwebClient: ThirdwebClient) =>
+    <TTransport extends Transport, TChain extends Chain | undefined = Chain | undefined>(
+      client: Client<TTransport, TChain>
+    ) => ({
+      getUserOperationGasPrice: async () =>
+        getUserOpGasFees({
+          options: {
+            client: thirdwebClient,
+            chain: defineChain({
+              ...(client.chain as any),
+              blockExplorers: undefined
+            }),
+            entrypointAddress: entryPoint07Address
+          }
+        })
+    })
   const clients = {
+    _custom_actions() {
+      const client = createThirdwebClient({
+        secretKey: process.env.THIRDWEB_SECRET
+      })
+      return thirdweb_actions(client)
+    },
+
     ethereum_wallet_client(chain: Chains) {
       if (!options.viem_signer) {
         throw new Error('Viem account is not provided')
@@ -121,7 +150,7 @@ export const pathway = <
     async smart_account_client(to_chain: Chains) {
       const owner = privateKeyToAccount(numberToHex(18n, { size: 32 }))
       const client = this.ethereum_public_client(to_chain, true)
-      const rpc = AA_TRANSPORTS(options.pimlico_api_key)[to_chain]
+      const rpc = AA_TRANSPORT(client.chain?.id)
       const account = await toLightSmartAccount({
         client,
         entryPoint: {
@@ -135,17 +164,11 @@ export const pathway = <
       const bundlerClient = createBundlerClient({
         account,
         client,
-        transport: http(rpc),
-        paymaster: true,
+        transport: http(rpc, {
+          fetchOptions: AA_TRANSPORT_HEADERS()
+        }),
         chain: VIEM_NETWORKS[to_chain]
-      }).extend(
-        pimlicoActions({
-          entryPoint: {
-            address: entryPoint07Address,
-            version: '0.7'
-          }
-        })
-      )
+      }).extend(this._custom_actions())
       return bundlerClient
     }
   }
@@ -406,7 +429,7 @@ export const pathway = <
       const multicall_msg = this.generate_eth_deposit_multicall_message(path, signature)
       const encoded_multicall = encodeFunctionData(multicall_msg)
       return {
-        hash: '0x' as Hex,
+        hash: keccak256(encoded_multicall),
         calls: [
           {
             order: 0,
@@ -602,7 +625,11 @@ export const pathway = <
   }
 
   const receive = {
-    async receive_on_noble(receive_message: ReceiveMessage): Promise<ExecutionResponse> {
+    async receive_on_noble(
+      receive_message: ReceiveMessage,
+      platform: 'mainnet' | 'testnet' = 'mainnet'
+    ): Promise<ExecutionResponse> {
+      if (platform !== options.platform) options.platform = platform
       const { message_bytes, circle_attestation, original_path: path } = receive_message
       const message = utilities.get_address_bytes(path.from_chain, message_bytes, false)
       const attestation = utilities.get_address_bytes(path.from_chain, circle_attestation!, false)
@@ -780,11 +807,13 @@ export const pathway = <
       }
 
       const get_burn_token = () => {
+        const canonical_usdc_on_noble =
+          '0x487039debedbf32d260137b0a6f66b90962bec777250910d253781de326a716d'
         switch (from_chain) {
           case 'noble':
-            return '0x487039debedbf32d260137b0a6f66b90962bec777250910d253781de326a716d'
+            return canonical_usdc_on_noble
           case 'grand':
-            return '0x487039debedbf32d260137b0a6f66b90962bec777250910d253781de326a716d'
+            return canonical_usdc_on_noble
           default:
             return toHex(utilities.bytes_from_hex(USDC_CONTRACTS[from_chain] as Address))
         }
@@ -876,13 +905,7 @@ export const pathway = <
         ])
       }
 
-      const [
-        op,
-        { baseFeePerGas },
-        {
-          fast: { maxFeePerGas, maxPriorityFeePerGas }
-        }
-      ] = await estimate_gas()
+      const [op, { baseFeePerGas }, { maxFeePerGas, maxPriorityFeePerGas }] = await estimate_gas()
 
       const {
         preVerificationGas,
@@ -890,11 +913,7 @@ export const pathway = <
         verificationGasLimit,
         paymasterVerificationGasLimit,
         paymasterPostOpGasLimit
-      } = await client.estimateUserOperationGas({
-        ...op,
-        maxFeePerGas,
-        maxPriorityFeePerGas
-      })
+      } = await client.estimateUserOperationGas(op)
 
       const gas_price = Math.min(
         Number(maxFeePerGas),
@@ -978,7 +997,8 @@ export const pathway = <
             ...path,
             fee: (exe_res.gas.deposit?.amount ?? 0n) + (exe_res.gas.receive?.amount ?? 0n)
           },
-          hash: exe_res.hash!
+          hash: exe_res.hash!,
+          calls: exe_res.calls
         })
       } catch (error) {
         return Err('An error occurred while depositing', error)
@@ -1001,12 +1021,15 @@ export const pathway = <
             this.estimate_deposit_on_noble(path),
             this.estimate_receive_on_eth(path)
           ])
+        } else if (to_chain == Chains.noble) {
+          ;[dg, rg] = await Promise.all([
+            this.estimate_deposit_on_eth(path),
+            this.estimate_receive_on_noble(path)
+          ])
         } else {
           ;[dg, rg] = await Promise.all([
             this.estimate_deposit_on_eth(path),
-            to_chain === Chains.noble
-              ? this.estimate_receive_on_noble(path)
-              : this.estimate_receive_on_eth(path)
+            this.estimate_receive_on_eth(path)
           ])
         }
 

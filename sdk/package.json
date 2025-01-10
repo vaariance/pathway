@@ -29,6 +29,7 @@
     "@ethereumjs/util": "^9.0.3",
     "axios": "^1.7.3",
     "permissionless": "^0.2.23",
+    "thirdweb": "^5.83.1",
     "viem": "^2.21.57"
   },
   "engines": {

@@ -21,15 +21,6 @@
     "outDir": "./dist",
     "rootDir": "."
   },
-  "include": [
-    "./*.ts",
-    "../global.env.d.ts",
-    "src/constants.ts",
-    "src/generated.ts",
-    "src/sdk.ts",
-    "src/fn.ts",
-    "src/types.ts",
-    "src/abis.ts"
-  ],
+  "include": ["./*.ts", "./**/*.ts", "../global.env.d.ts"],
   "exclude": ["node_modules", "dist"]
 }
