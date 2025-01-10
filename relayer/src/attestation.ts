@@ -46,7 +46,7 @@ export const handler: SQSHandler = async (event) => {
       if (attestation.status === AttestationStatus.complete) {
         const params: UpdateCommandInput = {
           TableName: process.env.MESSAGE_TABLE,
-          Key: { tx_hash: message.tx_hash },
+          Key: { hash: message.partition_key },
           UpdateExpression:
             "SET #status = :status, circle_attestation = :attestation",
           ExpressionAttributeNames: {

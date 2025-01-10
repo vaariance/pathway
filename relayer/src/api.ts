@@ -1,4 +1,4 @@
-import { ReceiveMessage } from "thepathway-js";
+import { ReceiveMessage, Call } from "thepathway-js";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
   DynamoDBDocumentClient,
@@ -24,11 +24,11 @@ BigInt.prototype.toJSON = function () {
   return this.toString();
 };
 
-app.get("/message/:tx_hash", async function (req, res) {
+app.get("/message/:partition_key", async function (req, res) {
   const params: GetCommandInput = {
     TableName: process.env.MESSAGE_TABLE,
     Key: {
-      tx_hash: req.params.tx_hash.toLowerCase(),
+      hash: req.params.partition_key.toLowerCase(),
     },
   };
 
@@ -38,7 +38,9 @@ app.get("/message/:tx_hash", async function (req, res) {
       const { ...rest } = Item;
       res.json({ ...rest });
     } else {
-      res.status(404).json({ error: 'Could not find tx with provided "hash"' });
+      res
+        .status(404)
+        .json({ error: 'Could not find tx with provided "hash or key"' });
     }
   } catch (error) {
     console.error(error);
@@ -46,9 +48,12 @@ app.get("/message/:tx_hash", async function (req, res) {
   }
 });
 
-app.post("/message/new/:tx_hash", async function (req, res) {
-  const message = req.body as ReceiveMessage;
-  const tx_hash = req.params.tx_hash.toLowerCase();
+app.post("/message/new", async function (req, res) {
+  const message = req.body as ReceiveMessage & Call[];
+  const {
+    tx_hash,
+    partition_key,
+  }: { tx_hash?: string; partition_key?: string } = req.query;
 
   if (!message.block_confirmation_in_ms) {
     res.status(400).json({ error: "Missing block confirmation in ms" });
@@ -56,11 +61,14 @@ app.post("/message/new/:tx_hash", async function (req, res) {
   if (!message.original_path) {
     res.status(400).json({ error: "Missing routing path message" });
   }
+  if (!tx_hash && !partition_key) {
+    res.status(400).json({ error: "Missing hash or key" });
+  }
 
   let params: GetCommandInput | PutCommandInput = {
     TableName: process.env.MESSAGE_TABLE,
     Key: {
-      tx_hash,
+      hash: tx_hash?.toLowerCase() ?? partition_key?.toLowerCase(),
     },
   };
 
@@ -69,7 +77,9 @@ app.post("/message/new/:tx_hash", async function (req, res) {
       new GetCommand(params as GetCommandInput)
     );
     if (Item) {
-      res.status(409).json({ error: 'Tx with provided "hash" already exists' });
+      res
+        .status(409)
+        .json({ error: 'Tx with provided "hash or key" already exists' });
     }
   } catch (error) {
     console.error(error);
@@ -80,6 +90,7 @@ app.post("/message/new/:tx_hash", async function (req, res) {
     ...params,
     Item: {
       tx_hash,
+      partition_key: tx_hash ?? partition_key,
       ...message,
       submitted_at: new Date().toISOString(),
     },

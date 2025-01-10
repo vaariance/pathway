@@ -9,6 +9,7 @@ stages:
   default:
     params:
       # sqs parameters
+      executioQueueName: ${self:service}-${sls:stage}-execution-queue
       attestationQueueName: ${self:service}-${sls:stage}-attestation-queue
       relayQueueName: ${self:service}-${sls:stage}-relay-queue
       retryQueueName: ${self:service}-${sls:stage}-retry-queue
@@ -19,9 +20,7 @@ stages:
       pool_id: ${self:custom.poolId}
       client_id: ${self:custom.clientId}
       apitoolkitSecret: ${self:custom.apiToolkitSecret}
-      nobleRpcUrl: ${self:custom.nobleRpcUrl}
       destinationCallerApiKey: ${self:custom.destinationCallerApiKey}
-      alchemyApiKey: ${self:custom.alchemyApiKey}
       thirdwebSecret: ${self:custom.thirdwebSecret}
 
 provider:
@@ -56,13 +55,12 @@ provider:
   environment:
     MESSAGE_TABLE: ${param:msgTableName}
     API_KEY_TABLE: ${param:apiKeyTableName}
+    EXECUTION_QUEUE_URL: https://sqs.${aws:region}.amazonaws.com/${aws:accountId}/${param:executioQueueName}
     ATTESTATION_QUEUE_URL: https://sqs.${aws:region}.amazonaws.com/${aws:accountId}/${param:attestationQueueName}
     RELAY_QUEUE_URL: https://sqs.${aws:region}.amazonaws.com/${aws:accountId}/${param:relayQueueName}
     RETRY_QUEUE_URL: https://sqs.${aws:region}.amazonaws.com/${aws:accountId}/${param:retryQueueName}
     APITOOLKIT_API_KEY: ${param:apitoolkitSecret}
-    NOBLE_RPC_URL: ${param:nobleRpcUrl}
     DESTINATION_CALLER_API_KEY: ${param:destinationCallerApiKey}
-    ALCHEMY_API_KEY: ${param:alchemyApiKey}
     THIRDWEB_SECRET: ${param:thirdwebSecret}
 
   httpApi:
@@ -80,28 +78,23 @@ provider:
 
 functions:
   authorizer:
-    handler: authorizer.handler
+    handler: src.authorizer.handler
 
   scheduler:
-    handler: scheduler.handler
+    handler: src.scheduler.handler
     events:
       - schedule: rate(2 minutes)
 
-  failsafe:
-    handler: failsafe.handler
-    events:
-      - schedule: rate(12 minutes)
-
   api:
-    handler: api.handler
+    handler: src.api.handler
     events:
       - httpApi:
-          path: /message/new/{tx_hash}
+          path: /message/new
           method: POST
           authorizer:
             name: lambdaAuthorizer
       - httpApi:
-          path: /message/{tx_hash}
+          path: /message/{partition_key}
           method: GET
           authorizer:
             name: lambdaAuthorizer
@@ -111,8 +104,21 @@ functions:
           authorizer:
             name: jwtAuthorizer
 
+  execution:
+    handler: src.execution.handler
+    timeout: 120
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - ExecutionQueue
+              - Arn
+          functionResponseType: ReportBatchItemFailures
+          batchSize: 10
+          maximumBatchingWindow: 30
+
   attestation:
-    handler: attestation.handler
+    handler: src.attestation.handler
     timeout: 120
     events:
       - sqs:
@@ -125,7 +131,7 @@ functions:
           maximumBatchingWindow: 30
 
   relay:
-    handler: relay.handler
+    handler: src.relay.handler
     timeout: 120
     memorySize: 1536
     events:
@@ -139,7 +145,7 @@ functions:
           maximumBatchingWindow: 30
 
   retry:
-    handler: retry.handler
+    handler: src.retry.handler
     timeout: 120
     events:
       - sqs:
@@ -157,10 +163,10 @@ resources:
       Type: AWS::DynamoDB::Table
       Properties:
         AttributeDefinitions:
-          - AttributeName: tx_hash
+          - AttributeName: hash
             AttributeType: S
         KeySchema:
-          - AttributeName: tx_hash
+          - AttributeName: hash
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
         TableName: ${param:msgTableName}
@@ -176,6 +182,12 @@ resources:
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
         TableName: ${param:apiKeyTableName}
+
+    ExecutionQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${param:executioQueueName}
+        VisibilityTimeout: 120
 
     AttestationQueue:
       Type: AWS::SQS::Queue
