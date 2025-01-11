@@ -6,7 +6,7 @@ import { pathway as Pathway, DOMAINS, ICCTP, MESSAGE_TRANSMITTERS, Chains } from
 
 import { Address, Hex } from 'viem'
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
-import { mnemonic, thirdweb_client } from './thirdweb.js'
+import { mnemonic, split_bundle, thirdweb_client } from './utils.js'
 
 BigInt.prototype.toJSON = function () {
   return this.toString()
@@ -118,17 +118,8 @@ export const handler: SQSHandler = async (event) => {
   const failed: SQSBatchItemFailure[] = []
   const retry_bundle: SQSRecord[] = []
 
-  const split_bundle = event.Records.reduce((acc, item) => {
-    const { original_path: path }: ReceiveMessageFormat = JSON.parse(item.body)
-    if (!acc[path.to_chain]) {
-      acc[path.to_chain] = []
-    }
-    acc[path.to_chain].push(item)
-    return acc
-  }, {} as Record<Chains, SQSRecord[]>)
-
   const relay_result = await Promise.all(
-    Object.entries(split_bundle).map(async ([chain, messages]) => {
+    Object.entries(split_bundle(event)).map(async ([chain, messages]) => {
       if (chain === 'noble' || chain === 'grand') {
         return relay_noble_message(messages)
       } else {
@@ -155,7 +146,6 @@ export const handler: SQSHandler = async (event) => {
         }
         return dynamodb_client
           .send(new UpdateCommand(params))
-          .then(() => {})
           .catch((error) => console.error(error))
       } else {
         const retry_at = new Date(Date.now() + 5 * 60 * 1000).toDateString() // 5 minutes
@@ -164,7 +154,8 @@ export const handler: SQSHandler = async (event) => {
           Key: { hash },
           UpdateExpression: 'SET #status = :status, retry_at = :retry_at',
           ExpressionAttributeNames: {
-            '#status': 'status'
+            '#status': 'status',
+            '#retry_at': 'retry_at'
           },
           ExpressionAttributeValues: {
             ':status': 'failed',

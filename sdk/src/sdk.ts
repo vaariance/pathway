@@ -176,7 +176,11 @@ export const pathway = <
   const utilities = {
     validate_path(path: Path) {
       const { from_chain, to_chain, receiver_address, amount } = path
-      if (receiver_address.startsWith('noble1') && to_chain !== Chains.noble) {
+      if (
+        receiver_address.startsWith('noble1') &&
+        to_chain !== Chains.noble &&
+        to_chain !== Chains.grand
+      ) {
         throw new Error('Receiver must be Noble address')
       }
 
@@ -663,9 +667,11 @@ export const pathway = <
     },
     async generate_eth_receive_message(
       deposit_hash: string,
-      from_chain: Chains
+      from_chain: Chains,
+      platform: 'mainnet' | 'testnet' = 'mainnet'
     ): Promise<Omit<ReceiveMessage, 'original_path'>> {
-      if (from_chain !== Chains.noble) {
+      if (platform !== options.platform) options.platform = platform
+      if (from_chain !== Chains.noble && from_chain !== Chains.grand) {
         // if to and from are both evm
         return await this.generate_noble_receive_message(deposit_hash, from_chain, {
           override_block_time: utilities.get_eth_block_height

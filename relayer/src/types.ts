@@ -6,7 +6,8 @@ export type ReceiveMessageFormat = Omit<ReceiveMessage, 'block_confirmation_in_m
   partition_key: string
   tx_hash?: string
   retry_at?: string
-} & Call[]
+  calls?: Call[]
+}
 
 export enum AttestationStatus {
   complete = 'complete',

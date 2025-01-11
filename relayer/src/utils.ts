@@ -17,6 +17,8 @@ import {
 
 import { getPaymasterAndData } from 'thirdweb/wallets/smart'
 import { createThirdwebClient, defineChain } from 'thirdweb'
+import { ReceiveMessageFormat } from './types'
+import { SQSEvent, SQSRecord } from 'aws-lambda'
 
 export const mnemonic = process.env.DESTINATION_CALLER_API_KEY.split('-').join(' ')
 const caller = mnemonicToAccount(mnemonic)
@@ -78,3 +80,13 @@ export const thirdweb_client = async (
 
   return { bundler_client, public_client }
 }
+
+export const split_bundle = (event: SQSEvent, by: 'to_chain' | 'from_chain' = 'to_chain') =>
+  event.Records.reduce((acc, item) => {
+    const { original_path: path }: ReceiveMessageFormat = JSON.parse(item.body)
+    if (!acc[path[by]]) {
+      acc[path[by]] = []
+    }
+    acc[path[by]].push(item)
+    return acc
+  }, {} as Record<Chains, SQSRecord[]>)
