@@ -15,16 +15,8 @@ remappings = [
     "@cctp/contracts=lib/evm-cctp-contracts/src",
 ]
 
-[rpc_endpoints]
-mainnet = "${RPC_URL_MAINNET}"
-optimism = "${RPC_URL_OPTIMISM}"
-avalanche = "${RPC_URL_AVALANCHE}"
-polygon = "${RPC_URL_POLYGON}"
-base = "${RPC_URL_BASE}"
-morph = "${RPC_URL_MORPH}"
-arbitrum = "${RPC_URL_ARBITRUM}"
-
 [etherscan]
 base = { key = "${BASESCAN_API_KEY}", chain = 8453, url = "https://api.basescan.org/api" }
 avalanche = { key = "verifyContract", chain = 43114, url = "https://api.routescan.io/v2/network/mainnet/evm/43114/etherscan" }
-morph = { key = "verifyContract", chain = 2818, url = "https://explorer-api.morphl2.io/api" }
+fuji = { key = "verifyContract", chain = 43113, url = "https://api.routescan.io/v2/network/testnet/evm/43113/etherscan" }
+sepolia = { key = "${ETHERSCAN_API_KEY}", chain = 11155111 }

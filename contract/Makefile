@@ -1,5 +1,7 @@
 -include .env
 
-deploy-$(chain) :; @forge script script/MutlicallWithPermit.s.sol:MutlicallWithPermitScript --private-key ${PRIVATE_KEY} --chain ${chain} --broadcast --verify -vvv
+deploy :; @forge script script/MulticallWithPermit.s.sol:MulticallWithPermitScript --private-key ${PRIVATE_KEY} --chain ${chain} --rpc-url ${RPC_URL_$(chain)} --broadcast --verify -vvv
 
-verify-$(chain) :; forge verify-contract ${address} src/MutlicallWithPermit.sol:MutlicallWithPermit --chain ${chain} --verifier-url=${$(chain)VERIFIER_URL} --etherscan-api-key=${$(chain)SCAN_API_KEY}
+verify :; forge verify-contract ${address} src/MulticallWithPermit.sol:MulticallWithPermit --chain ${chain}
+
+dry-run :; forge script script/MulticallWithPermit.s.sol:MulticallWithPermitScript --rpc-url ${RPC_URL_$(chain)} --chain ${chain} -vvv

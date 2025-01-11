@@ -28,7 +28,7 @@ contract MulticallWithPermit is Initializable, Ownable, Pausable, ReentrancyGuar
     /// @param user The user address whose tokens will be transferred
     /// @param amount The amount of tokens to transfer
     /// @param message The message to be sent to the cctp messenger contract
-    /// @param deadline The deadline for the permit signature which is a combination of the deadline 
+    /// @param deadline The deadline for the permit signature which is a combination of the deadline
     ///                 for the signature and relayer address permitted to execute the call
     /// @param v The v component of the permit signature
     /// @param r The r component of the permit signature

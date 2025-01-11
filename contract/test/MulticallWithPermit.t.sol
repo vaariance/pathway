@@ -7,6 +7,7 @@ import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC2
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {MulticallWithPermit} from "../src/MulticallWithPermit.sol";
 import {Config} from "../script/Config.sol";
+import {ByteCodes} from "./Bytecodes.sol";
 import {MockMessenger, SafeERC20} from "./MockMessenger.sol";
 
 contract MulticallWithPermitTest is Test {
@@ -28,8 +29,8 @@ contract MulticallWithPermitTest is Test {
 
     function setUp() public {
         networkConfig = Config.getActiveNetworkConfig();
-        vm.etch(networkConfig.usdc, Config.usdcCode);
-        vm.etch(address(otherToken), Config.usdcCode);
+        vm.etch(networkConfig.usdc, ByteCodes.usdcCode);
+        vm.etch(address(otherToken), ByteCodes.usdcCode);
         multicaller = new MulticallWithPermit(owner);
         vm.etch(networkConfig.messenger, address(new MockMessenger()).code);
         multicaller.initialize(networkConfig.usdc, networkConfig.messenger);
