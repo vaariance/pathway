@@ -129,6 +129,14 @@ contract MulticallWithPermit is Initializable, Ownable2Step, Pausable, Reentranc
         _unpause();
     }
 
+    function addMessengerAllowance(uint256 _value) external onlyOwner {
+        usdc.approve(messenger, _value);
+    }
+
+    function revokeMessengerAllowance() external onlyOwner {
+        usdc.approve(messenger, 0);
+    }
+
     /// @notice Internal function to process permit
     /// @dev Verifies amount and executes the ERC20 permit
     /// @param user The user address

@@ -50,6 +50,20 @@ contract MulticallWithPermitTest is Test {
         assertEq(multicaller.paused(), false);
     }
 
+    function test_AddMessengerAllowance() public {
+        vm.startPrank(owner);
+        multicaller.addMessengerAllowance(100e6);
+        assertEq(IERC20(networkConfig.usdc).allowance(address(multicaller), networkConfig.messenger), 100e6);
+        vm.stopPrank();
+    }
+
+    function test_RevokeMessengerAllowance() public {
+        vm.startPrank(owner);
+        multicaller.revokeMessengerAllowance();
+        assertEq(IERC20(networkConfig.usdc).allowance(address(multicaller), networkConfig.messenger), 0);
+        vm.stopPrank();
+    }
+
     function test_Withdraw() public {
         vm.startPrank(owner);
         uint256 amount = 100e6;
