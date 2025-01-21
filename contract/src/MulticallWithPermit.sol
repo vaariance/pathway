@@ -78,7 +78,8 @@ contract MulticallWithPermit is Initializable, Ownable2Step, Pausable, Reentranc
     }
 
     /// @notice Executes a single permit and message call
-    /// @dev Only callable by authorized relayer
+    /// @dev Can be called by any relayer if and only if -
+    ///      the relayer is authorized by the user in the permit deadline field
     /// @param call The CallWithPermit struct containing all parameters
     /// @return nonce The unique nonce from the messenger
     function executeCallWithPermit(CallWithPermit calldata call)
