@@ -49,8 +49,6 @@ contract MulticallWithPermit is Initializable, Ownable2Step, Pausable, Reentranc
     error AmountCannotBeZero();
     /// @notice Thrown when the call to cctp messenger fails
     error DepositFailed();
-    /// @notice Thrown when non-relayer tries to execute calls
-    error UnAuthorizedRelayer();
     /// @notice Thrown when trying to withdraw USDC
     error TokenCannotBeWithdrawnManually();
     /// @notice Thrown when the permit deadline has expired
@@ -79,7 +77,7 @@ contract MulticallWithPermit is Initializable, Ownable2Step, Pausable, Reentranc
 
     /// @notice Executes a single permit and message call
     /// @dev Can be called by any relayer if and only if -
-    ///      the relayer is authorized by the user in the permit deadline field
+    ///      the relayer/calller is authorized by the user in the permit deadline field
     /// @param call The CallWithPermit struct containing all parameters
     /// @return nonce The unique nonce from the messenger
     function executeCallWithPermit(CallWithPermit calldata call)
@@ -89,7 +87,8 @@ contract MulticallWithPermit is Initializable, Ownable2Step, Pausable, Reentranc
         returns (uint64 nonce)
     {
         address self = address(this);
-        permit(call.user, self, call.amount, call.deadline, call.v, call.r, call.s);
+        bytes32 verificationHash = extractVerificationHash(call.message);
+        permit(call.user, self, call.amount, call.deadline, call.v, call.r, call.s, verificationHash);
         nonce = sendMessage(call.user, self, call.amount, call.message);
         drain(usdc, self, msg.sender);
     }
@@ -107,7 +106,8 @@ contract MulticallWithPermit is Initializable, Ownable2Step, Pausable, Reentranc
         nonces = new uint64[](calls.length);
         for (uint256 i = 0; i < calls.length; i++) {
             CallWithPermit calldata call = calls[i];
-            permit(call.user, self, call.amount, call.deadline, call.v, call.r, call.s);
+            bytes32 verificationHash = extractVerificationHash(call.message);
+            permit(call.user, self, call.amount, call.deadline, call.v, call.r, call.s, verificationHash);
         }
         for (uint256 i = 0; i < calls.length; i++) {
             CallWithPermit calldata call = calls[i];
@@ -140,6 +140,10 @@ contract MulticallWithPermit is Initializable, Ownable2Step, Pausable, Reentranc
 
     /// @notice Internal function to process permit
     /// @dev Verifies amount and executes the ERC20 permit
+    ///      We Make an Assumption - the deadline can be anything.
+    ///      we believe the real deadline can be derived from the CCTP msg params.
+    ///      theory 1 - if the params of the cctp msg are different, the permit will fail
+    ///      theory 2 - if we are wrong about the deadline, the permit will fail
     /// @param user The user address
     /// @param self The contract address
     /// @param amount The amount to permit
@@ -147,14 +151,22 @@ contract MulticallWithPermit is Initializable, Ownable2Step, Pausable, Reentranc
     /// @param v The v component of the signature
     /// @param r The r component of the signature
     /// @param s The s component of the signature
-    function permit(address user, address self, uint256 amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
-        internal
-    {
+    /// @param verificationHash The hash of the verification parameters
+    function permit(
+        address user,
+        address self,
+        uint256 amount,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s,
+        bytes32 verificationHash
+    ) internal {
         require(amount > 0, AmountCannotBeZero());
-        (uint96 _deadline, address _relayer) = decodeDeadlineField(deadline);
-        require(block.timestamp <= _deadline, PermitDeadlineExpired());
-        require(msg.sender == _relayer, UnAuthorizedRelayer());
-        IERC20Permit(address(usdc)).permit(user, self, amount, deadline, v, r, s);
+        uint256 assumedDeadline = deadline - uint256(verificationHash);
+        uint256 expectedDeadline = assumedDeadline + uint256(verificationHash);
+        require(block.timestamp <= assumedDeadline, PermitDeadlineExpired());
+        IERC20Permit(address(usdc)).permit(user, self, amount, expectedDeadline, v, r, s);
     }
 
     /// @notice Internal function to send a `DepositForBurnWithCaller` message to CCTP messenger
@@ -174,6 +186,17 @@ contract MulticallWithPermit is Initializable, Ownable2Step, Pausable, Reentranc
         nonce = abi.decode(_nonce, (uint64));
         require(nonce > 0, DepositFailed());
         emit MulticallExecuted(user, msg.sender, amount, nonce);
+    }
+
+    /// @notice Internal function to extract the verification hash from the CCTP message
+    /// @dev The verification hash is a hash of the caller, receipient, and domain
+    ///      We make an Assumption - the caller is the relayer
+    ///      theory 1 - If the caller is not the expected relayer, the permit will fail
+    function extractVerificationHash(bytes calldata message) internal view returns (bytes32) {
+        uint32 domain = uint32(uint256(bytes32(message[36:68])));
+        bytes32 receipient = bytes32(message[68:100]);
+        address relayer = msg.sender;
+        return keccak256(abi.encodePacked(relayer, receipient, domain));
     }
 
     /// @notice Prevents any remaining balance from being left in the contract post execution

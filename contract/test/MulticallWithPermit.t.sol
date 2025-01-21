@@ -27,6 +27,8 @@ contract MulticallWithPermitTest is Test {
 
     address otherToken = vm.addr(0x123);
 
+    uint32 fakeDomain = uint32(4);
+
     function setUp() public {
         networkConfig = Config.getActiveNetworkConfig();
         vm.etch(networkConfig.usdc, ByteCodes.usdcCode);
@@ -103,7 +105,8 @@ contract MulticallWithPermitTest is Test {
         assertEq(IERC20(networkConfig.usdc).balanceOf(user), initialUserBalance);
 
         uint96 realDeadline = uint96(block.timestamp + 3600); // 1 hour from now
-        uint256 packedDeadline = packDeadlineAndRelayer(realDeadline, relayer);
+        bytes32 hash = encodeRelayerDomainAndReceipient(relayer, user);
+        uint256 packedDeadline = packDeadlineAndHash(realDeadline, hash);
 
         uint256 amount = 100e6; // 100 USDC
         uint256 fee = 4e6; // 4 USDC
@@ -145,7 +148,8 @@ contract MulticallWithPermitTest is Test {
         address relayer = vm.addr(0xEAE);
 
         uint96 realDeadline = uint96(block.timestamp + 3600); // 1 hour from now
-        uint256 packedDeadline = packDeadlineAndRelayer(realDeadline, relayer);
+        bytes32 hash = encodeRelayerDomainAndReceipient(relayer, user);
+        uint256 packedDeadline = packDeadlineAndHash(realDeadline, hash);
 
         (uint8 v, bytes32 r, bytes32 s) = signPermit(0, packedDeadline, userPrivKey);
 
@@ -161,7 +165,8 @@ contract MulticallWithPermitTest is Test {
         address invalidRelayer = vm.addr(0xEAF);
 
         uint96 realDeadline = uint96(block.timestamp + 3600); // 1 hour from now
-        uint256 packedDeadline = packDeadlineAndRelayer(realDeadline, relayer);
+        bytes32 hash = encodeRelayerDomainAndReceipient(relayer, user);
+        uint256 packedDeadline = packDeadlineAndHash(realDeadline, hash);
 
         uint256 amount = 100e6; // 100 USDC
         uint256 fee = 4e6; // 4 USDC
@@ -172,7 +177,7 @@ contract MulticallWithPermitTest is Test {
             encodeMessage(user, amount, fee, amount, packedDeadline, v, r, s);
 
         vm.prank(invalidRelayer);
-        vm.expectRevert(MulticallWithPermit.UnAuthorizedRelayer.selector);
+        vm.expectRevert();
         multicaller.executeCallWithPermit(callData);
     }
 
@@ -183,7 +188,8 @@ contract MulticallWithPermitTest is Test {
         deal(networkConfig.usdc, user, initialUserBalance);
 
         uint96 realDeadline = uint96(block.timestamp + 3600); // 1 hour from now
-        uint256 packedDeadline = packDeadlineAndRelayer(realDeadline, relayer);
+        bytes32 hash = encodeRelayerDomainAndReceipient(relayer, user);
+        uint256 packedDeadline = packDeadlineAndHash(realDeadline, hash);
 
         uint256 amount = 100e6; // 100 USDC
 
@@ -204,7 +210,8 @@ contract MulticallWithPermitTest is Test {
         deal(networkConfig.usdc, user, initialUserBalance);
 
         uint96 realDeadline = uint96(block.timestamp + 3600); // 1 hour from now
-        uint256 packedDeadline = packDeadlineAndRelayer(realDeadline, relayer);
+        bytes32 hash = encodeRelayerDomainAndReceipient(relayer, user);
+        uint256 packedDeadline = packDeadlineAndHash(realDeadline, hash);
         vm.warp(packedDeadline + 1);
         uint256 amount = 100e6; // 100 USDC
 
@@ -229,19 +236,23 @@ contract MulticallWithPermitTest is Test {
         assertEq(IERC20(networkConfig.usdc).balanceOf(user2), initialUserBalance);
 
         uint96 realDeadline = uint96(block.timestamp + 3600); // 1 hour from now
-        uint256 packedDeadline = packDeadlineAndRelayer(realDeadline, relayer);
+        bytes32 hash = encodeRelayerDomainAndReceipient(relayer, user);
+        uint256 packedDeadline1 = packDeadlineAndHash(realDeadline, hash);
+
+        bytes32 hash2 = encodeRelayerDomainAndReceipient(relayer, user2);
+        uint256 packedDeadline2 = packDeadlineAndHash(realDeadline, hash2);
 
         uint256 amount = 100e6; // 100 USDC
         uint256 fee = 4e6; // 4 USDC
 
-        (uint8 v, bytes32 r, bytes32 s) = signPermit(amount + fee, packedDeadline, userPrivKey);
+        (uint8 v, bytes32 r, bytes32 s) = signPermit(amount + fee, packedDeadline1, userPrivKey);
 
-        (uint8 v2, bytes32 r2, bytes32 s2) = signPermit(amount + fee, packedDeadline, user2PrivKey);
+        (uint8 v2, bytes32 r2, bytes32 s2) = signPermit(amount + fee, packedDeadline2, user2PrivKey);
 
         MulticallWithPermit.CallWithPermit memory callData1 =
-            encodeMessage(user, amount, fee, amount, packedDeadline, v, r, s);
+            encodeMessage(user, amount, fee, amount, packedDeadline1, v, r, s);
         MulticallWithPermit.CallWithPermit memory callData2 =
-            encodeMessage(user2, amount, fee, amount, packedDeadline, v2, r2, s2);
+            encodeMessage(user2, amount, fee, amount, packedDeadline2, v2, r2, s2);
 
         vm.expectEmit(
             true, // check topic for `user` (indexed)
@@ -289,8 +300,12 @@ contract MulticallWithPermitTest is Test {
         assertEq(relayerBalance, fee * 2);
     }
 
-    function packDeadlineAndRelayer(uint96 realDeadline, address relayer) internal pure returns (uint256) {
-        return (uint256(realDeadline) << 160) | uint160(relayer);
+    function packDeadlineAndHash(uint96 realDeadline, bytes32 hash) internal pure returns (uint256) {
+        return uint256(realDeadline) + uint256(hash);
+    }
+
+    function encodeRelayerDomainAndReceipient(address _relayer, address _recipient) internal view returns (bytes32) {
+        return keccak256(abi.encodePacked(_relayer, bytes32(uint256(uint160(_recipient))), fakeDomain));
     }
 
     function signPermit(uint256 value, uint256 deadline, uint256 privKey)
@@ -317,19 +332,20 @@ contract MulticallWithPermitTest is Test {
         bytes32 r,
         bytes32 s
     ) internal view returns (MulticallWithPermit.CallWithPermit memory callData) {
+        bytes memory message = abi.encodeCall(
+            MockMessenger.depositForBurnWithCaller,
+            (
+                burnAmount,
+                fakeDomain, // fake domain
+                bytes32(uint256(uint160(_user))),
+                networkConfig.usdc,
+                bytes32(uint256(uint160(packedDeadline)))
+            )
+        );
         return MulticallWithPermit.CallWithPermit({
             user: _user,
             amount: amount + fee,
-            message: abi.encodeCall(
-                MockMessenger.depositForBurnWithCaller,
-                (
-                    burnAmount,
-                    uint32(4), // fake domain
-                    bytes32(uint256(uint160(_user))),
-                    networkConfig.usdc,
-                    bytes32(uint256(uint160(packedDeadline)))
-                )
-            ),
+            message: message,
             deadline: packedDeadline,
             v: v,
             r: r,

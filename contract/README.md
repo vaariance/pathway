@@ -7,7 +7,7 @@ MultcallerWithPermit:
 - **one-click**: Users can easily send cross-chain transactions with a single permit.
 - **forawarding**: User specified forwarder can execute on behalf of the user, and automactically receive the transaction fee.
 - **multicall**: Allows a forwarder to bundle multiple cross-chain transactions in a single call.
-- **95% test coverage**: Rigorously Tested
+- **92% test coverage**: Rigorously Tested
 - **Audited**: Audited by the security team at [guild audits](https://guildaudits.com/)
 
 ## Usage
