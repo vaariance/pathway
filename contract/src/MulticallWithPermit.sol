@@ -4,7 +4,7 @@ pragma solidity 0.8.26;
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable, Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -18,7 +18,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 ///         and the associated fees included in other items in the batch is sent to the relayer.
 /// @dev    Implements reentry protection, pausability, and owner controls
 ///         For future improvements, consider registering multiple relayers; allowing gamified relayer selection
-contract MulticallWithPermit is Initializable, Ownable, Pausable, ReentrancyGuard {
+contract MulticallWithPermit is Initializable, Ownable2Step, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IERC20 public usdc;
