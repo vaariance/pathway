@@ -338,7 +338,7 @@ export const pathway = <
 
   const permit = {
     async generate_permit_message(path: Path) {
-      const { sender_address, from_chain, amount } = path
+      const { sender_address, from_chain, amount, to_chain, receiver_address } = path
       const client = clients.ethereum_public_client(from_chain, true)
       const chain = VIEM_NETWORKS[from_chain]!
       const contract = USDC_CONTRACTS[from_chain] as Address
@@ -378,7 +378,18 @@ export const pathway = <
 
       const deadline = Math.floor(Date.now() / 1000) + 3600
       const relayer = DESTINATION_CALLERS[from_chain] as Address
-      const packed = (BigInt(deadline) << 160n) | hexToBigInt(relayer)
+
+      const hash = keccak256(
+        encodePacked(
+          ['address', 'bytes32', 'uint32'],
+          [
+            relayer,
+            toHex(utilities.get_address_bytes(to_chain, receiver_address)),
+            DOMAINS[to_chain]
+          ]
+        )
+      )
+      const packed = BigInt(deadline) + hexToBigInt(hash)
 
       const message = {
         owner: sender_address,
