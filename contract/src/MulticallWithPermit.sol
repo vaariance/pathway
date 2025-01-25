@@ -209,9 +209,4 @@ contract MulticallWithPermit is Initializable, Ownable2Step, Pausable, Reentranc
             token.safeTransfer(to, remaining);
         }
     }
-
-    function decodeDeadlineField(uint256 field) internal pure returns (uint96 deadline, address relayer) {
-        relayer = address(uint160(field));
-        deadline = uint96(field >> 160);
-    }
 }
